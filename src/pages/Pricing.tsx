@@ -235,7 +235,28 @@ export default function PricingPage() {
         </Button>
       </section>
 
-      <footer className="border-t bg-gray-50 py-12">
+      <section className="border-t bg-gray-50 py-12">
+        <div className="mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
+          <div className="rounded-2xl border-2 border-blue-100 bg-white p-8 shadow-lg">
+            <div className="mb-6 flex flex-col items-center">
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-[#c9a961] to-[#b8935a] text-2xl font-bold text-white">
+                JP
+              </div>
+              <p className="text-lg text-gray-700 italic leading-relaxed">
+                “As a licensed agent, I’ve used countless tools to manage my transactions. ContractFlowAI is the only one that
+                actually keeps me organized without the headache. No more missed deadlines, no more scattered notes. Everything I
+                need in one place.”
+              </p>
+              <div className="mt-4 border-t border-gray-200 pt-4 text-sm text-gray-600">
+                <p className="font-semibold text-gray-900">Jackie Poponi</p>
+                <p>Licensed Real Estate Agent</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer className="border-t bg-gray-50 py-10">
         <div className="mx-auto flex max-w-7xl flex-col items-center gap-6 px-6 text-center text-gray-600 md:flex-row md:justify-between">
           <div className="flex items-center gap-2">
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#1e3a5f]">
