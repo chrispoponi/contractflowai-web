@@ -1,26 +1,220 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { ArrowRight, Bell, Calendar, CheckCircle, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import { useAuth } from '@/components/providers/AuthProvider'
 
 export default function Landing() {
+  const navigate = useNavigate()
+  const { user } = useAuth() ?? {}
+
+  const handleGetStarted = () => {
+    if (user) {
+      navigate('/dashboard')
+      return
+    }
+    const urlParams = new URLSearchParams(window.location.search)
+    const refCode = urlParams.get('code') || urlParams.get('ref')
+    if (refCode) {
+      sessionStorage.setItem('pending_ref_code', refCode)
+    }
+    navigate('/pricing')
+  }
+
+  const handleSignIn = () => {
+    navigate('/login')
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="mx-auto max-w-5xl px-6 py-16 text-center">
-        <p className="text-sm uppercase tracking-wide text-indigo-600">Built on Supabase + Cloudflare Pages</p>
-        <h1 className="mt-4 text-4xl font-semibold text-slate-900">
-          ContractFlowAI helps teams close faster with secure storage, typed queries, and Edge Functions.
-        </h1>
-        <p className="mt-4 text-slate-500">
-          Every request flows through Supabase Row Level Security, ensuring each user only sees their own contracts, teams, and organizations.
-        </p>
-        <div className="mt-8 flex flex-wrap justify-center gap-3">
-          <Button asChild>
-            <Link to="/pricing">Start for free</Link>
-          </Button>
-          <Button variant="outline" asChild>
-            <Link to="/login">Already using ContractFlowAI?</Link>
-          </Button>
+    <div className="min-h-screen">
+      <style>
+        {`
+          [class*="base44-widget"],
+          [class*="base44-editor"],
+          [id*="base44-widget"],
+          [id*="base44-editor"] {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+          }
+        `}
+      </style>
+
+      <nav className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-[#1e3a5f] to-[#2563eb] rounded-xl flex items-center justify-center shadow-lg">
+                <FileText className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-2xl font-bold text-gray-900">ContractFlowAI</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <Link to="/pricing">
+                <Button variant="ghost">Pricing</Button>
+              </Link>
+              <Button variant="outline" onClick={handleSignIn}>
+                Sign In
+              </Button>
+              <Button
+                onClick={handleGetStarted}
+                className="bg-gradient-to-r from-[#1e3a5f] to-[#2563eb] hover:from-[#2d4a6f] hover:to-[#3b5998] text-white"
+              >
+                Try It Free
+              </Button>
+            </div>
+          </div>
         </div>
-      </div>
+      </nav>
+
+      <section className="pt-20 pb-16 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center max-w-3xl mx-auto">
+            <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
+              Never Miss a Real Estate
+              <span className="block text-transparent bg-clip-text bg-gradient-to-r from-[#1e3a5f] to-[#2563eb]">
+                Deadline Again
+              </span>
+            </h1>
+            <p className="text-xl text-gray-600 mb-8">
+              AI-powered transaction management that keeps you on track. Upload contracts, get automatic reminders, and close deals faster.
+            </p>
+            <div className="flex gap-4 justify-center flex-wrap">
+              <Button
+                size="lg"
+                onClick={handleGetStarted}
+                className="bg-gradient-to-r from-[#1e3a5f] to-[#2563eb] hover:from-[#2d4a6f] hover:to-[#3b5998] text-white px-8 py-6 text-lg"
+              >
+                Start Free Trial
+                <ArrowRight className="w-5 h-5 ml-2" />
+              </Button>
+              <Link to="/pricing">
+                <Button size="lg" variant="outline" className="px-8 py-6 text-lg">
+                  View Pricing
+                </Button>
+              </Link>
+            </div>
+            <p className="text-sm text-gray-500 mt-4">60-day free trial • No credit card required • Cancel anytime</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="py-20 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">Everything You Need to Stay On Track</h2>
+            <p className="text-xl text-gray-600">Built specifically for real estate agents who hate missing deadlines</p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              {
+                icon: FileText,
+                title: 'AI Contract Upload',
+                description: 'Upload any contract PDF and our AI automatically extracts all dates, parties, and terms in seconds.',
+                bullets: ['Inspection, appraisal, closing dates', 'Buyer/seller contact info', 'Counter offer tracking']
+              },
+              {
+                icon: Bell,
+                title: 'Smart Reminders',
+                description: 'Never miss a deadline with automated email reminders customized to your preferences.',
+                bullets: ['7, 3, 1 day alerts (customizable)', 'Overdue date warnings', 'Skip completed milestones']
+              },
+              {
+                icon: Calendar,
+                title: 'Visual Calendar',
+                description: 'See all your transactions at a glance. Color-coded by milestone type, sorted by urgency.',
+                bullets: ['All contracts in one view', 'Export to Google/Apple Calendar', 'Bulk email client timelines']
+              }
+            ].map(({ icon: Icon, title, description, bullets }) => (
+              <Card key={title} className="border-2 hover:border-[#1e3a5f] transition-all duration-300 hover:shadow-xl">
+                <CardContent className="p-8">
+                  <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-4">
+                    <Icon className="w-6 h-6 text-[#1e3a5f]" />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-3">{title}</h3>
+                  <p className="text-gray-600 mb-4">{description}</p>
+                  <ul className="space-y-2">
+                    {bullets.map((bullet) => (
+                      <li key={bullet} className="flex items-start gap-2 text-sm text-gray-600">
+                        <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                        <span>{bullet}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="py-16 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-blue-50 to-indigo-50">
+        <div className="max-w-4xl mx-auto text-center">
+          <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8 border-2 border-blue-100">
+            <div className="mb-4">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-[#c9a961] to-[#b8935a] rounded-full mx-auto flex items-center justify-center">
+                <span className="text-white font-bold text-lg sm:text-2xl">JP</span>
+              </div>
+            </div>
+            <p className="text-base sm:text-lg text-gray-700 italic mb-4 sm:mb-6 leading-relaxed">
+              "As a licensed agent, I've used countless tools to manage my transactions. ContractFlowAI is the only one that actually keeps me organized without the headache. No more missed deadlines, no more scattered notes. Everything I need in one place."
+            </p>
+            <div className="border-t border-gray-200 pt-4">
+              <p className="font-semibold text-gray-900 text-sm sm:text-base">Jackie Poponi</p>
+              <p className="text-xs sm:text-sm text-gray-600">Licensed Real Estate Agent</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="py-20 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto text-center">
+          <h2 className="text-4xl font-bold text-gray-900 mb-6">Ready to Stop Missing Deadlines?</h2>
+          <p className="text-xl text-gray-600 mb-8">Start your 60-day free trial. No credit card required.</p>
+          <div className="flex gap-4 justify-center flex-wrap">
+            <Button
+              size="lg"
+              onClick={handleGetStarted}
+              className="bg-gradient-to-r from-[#1e3a5f] to-[#2563eb] hover:from-[#2d4a6f] hover:to-[#3b5998] text-white px-8 py-6 text-lg"
+            >
+              Start Free Trial
+              <ArrowRight className="w-5 h-5 ml-2" />
+            </Button>
+            <Link to="/pricing">
+              <Button size="lg" variant="outline" className="px-8 py-6 text-lg">
+                View Pricing
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <footer className="border-t bg-white py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-gradient-to-br from-[#1e3a5f] to-[#2563eb] rounded-lg flex items-center justify-center">
+                <FileText className="w-4 h-4 text-white" />
+              </div>
+              <span className="font-bold text-gray-900">ContractFlowAI</span>
+            </div>
+            <div className="flex gap-6 text-sm text-gray-600">
+              <Link to="/privacy" className="hover:text-gray-900">
+                Privacy Policy
+              </Link>
+              <Link to="/pricing" className="hover:text-gray-900">
+                Pricing
+              </Link>
+              <button onClick={handleSignIn} className="hover:text-gray-900">
+                Sign In
+              </button>
+            </div>
+          </div>
+          <div className="mt-8 text-center text-sm text-gray-500">© 2025 ContractFlowAI. All rights reserved. Built for real estate professionals.</div>
+        </div>
+      </footer>
     </div>
   )
 }
