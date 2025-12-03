@@ -1,62 +1,16 @@
 import { supabase } from '../client'
-import type { Tables, TablesInsert, TablesUpdate } from '../types'
 
-export async function listContracts(userId: string) {
-  const { data, error } = await supabase
-    .from('contracts')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-
-  if (error) {
-    console.error(error)
-    throw error
-  }
-  return data as Tables<'contracts'>[]
+export const ContractsAPI = {
+  list: (uid: string) => supabase.from('contracts').select('*').eq('user_id', uid),
+  get: (id: string, uid: string) => supabase.from('contracts').select('*').eq('id', id).eq('user_id', uid).single(),
+  update: (id: string, uid: string, payload: Record<string, unknown>) =>
+    supabase.from('contracts').update(payload).eq('id', id).eq('user_id', uid),
+  listCounterOffers: (contractId: string) =>
+    supabase.from('contracts').select('*').eq('parent_contract_id', contractId).order('created_at', { ascending: false })
 }
 
-export async function fetchContract(contractId: string, userId: string) {
-  const { data, error } = await supabase
-    .from('contracts')
-    .select('*')
-    .eq('id', contractId)
-    .eq('user_id', userId)
-    .single()
-
-  if (error) {
-    console.error(error)
-    throw error
-  }
-
-  return data as Tables<'contracts'>
-}
-
-export async function insertContract(payload: TablesInsert<'contracts'>) {
-  const { data, error } = await supabase.from('contracts').insert(payload).select().single()
-  if (error) {
-    console.error(error)
-    throw error
-  }
-  return data as Tables<'contracts'>
-}
-
-export async function updateContract(contractId: string, updates: TablesUpdate<'contracts'>) {
-  const { error } = await supabase.from('contracts').update(updates).eq('id', contractId)
-  if (error) {
-    console.error(error)
-    throw error
-  }
-}
-
-export async function listCounterOffers(contractId: string) {
-  const { data, error } = await supabase
-    .from('contracts')
-    .select('*')
-    .eq('parent_contract_id', contractId)
-    .order('created_at', { ascending: false })
-  if (error) {
-    console.error(error)
-    throw error
-  }
-  return data as Tables<'contracts'>[]
-}
+export const listContracts = (uid: string) => ContractsAPI.list(uid)
+export const fetchContract = (id: string, uid: string) => ContractsAPI.get(id, uid)
+export const updateContract = (id: string, uid: string, payload: Record<string, unknown>) =>
+  ContractsAPI.update(id, uid, payload)
+export const listCounterOffers = (contractId: string) => ContractsAPI.listCounterOffers(contractId)

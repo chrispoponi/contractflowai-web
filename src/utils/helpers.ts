@@ -1,12 +1,6 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
-}
+export const notEmpty = <T>(val: T | null | undefined): val is T => val !== null && val !== undefined
 
-export function invariant(condition: unknown, message: string): asserts condition {
-  if (!condition) {
-    throw new Error(message)
-  }
-}
+export const cn = (...inputs: ClassValue[]) => twMerge(clsx(inputs))
