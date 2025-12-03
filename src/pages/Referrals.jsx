@@ -1,12 +1,12 @@
 
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Gift, Copy, Check, Users, Mail, Link as LinkIcon } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { getCurrentProfile, fetchReferralsByEmail, createReferral, redirectToLogin } from "@/api/services";
 
 export default function ReferralsPage() {
   const [user, setUser] = useState(null);
@@ -23,13 +23,15 @@ export default function ReferralsPage() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const userData = await base44.auth.me();
+      const userData = await getCurrentProfile();
+      if (!userData) {
+        redirectToLogin(window.location.pathname);
+        return;
+      }
       setUser(userData);
 
       // Get user's referral code and referrals
-      const myReferrals = await base44.entities.Referral.filter({
-        referrer_email: userData.email
-      });
+      const myReferrals = await fetchReferralsByEmail(userData.email);
 
       if (myReferrals.length > 0) {
         // User already has a referral code
@@ -38,6 +40,7 @@ export default function ReferralsPage() {
       }
     } catch (error) {
       console.error("Error loading referrals:", error);
+      redirectToLogin(window.location.pathname);
     }
     setIsLoading(false);
   };
@@ -50,7 +53,7 @@ export default function ReferralsPage() {
       const code = `CF-${randomPart}`;
       
       // Create referral entry
-      await base44.entities.Referral.create({
+      await createReferral({
         referrer_email: user.email,
         ref_code: code,
         status: 'pending'

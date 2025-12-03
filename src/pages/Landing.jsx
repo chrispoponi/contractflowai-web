@@ -3,53 +3,36 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle, Calendar, Bell, FileText, Users, ArrowRight } from "lucide-react";
-import { base44 } from "@/api/base44Client";
 import { Link, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
+import { redirectToLogin, isAuthenticated } from "@/api/services";
 
 export default function LandingPage() {
   const navigate = useNavigate();
 
-  const handleGetStarted = () => {
-    // Check if user is already authenticated
-    base44.auth.isAuthenticated().then(isAuth => {
-      if (isAuth) {
-        navigate(createPageUrl("Dashboard"));
-      } else {
-        // Check for referral code in URL (support both 'ref' and 'code' parameters)
-        const urlParams = new URLSearchParams(window.location.search);
-        const refCode = urlParams.get('code') || urlParams.get('ref');
-        
-        if (refCode) {
-          // Store ref code in sessionStorage to use after login
-          sessionStorage.setItem('pending_ref_code', refCode);
-        }
-        
-        base44.auth.redirectToLogin(createPageUrl("Landing"));
-      }
-    });
+  const handleGetStarted = async () => {
+    const alreadySignedIn = await isAuthenticated();
+    if (alreadySignedIn) {
+      navigate(createPageUrl("Dashboard"));
+      return;
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const refCode = urlParams.get('code') || urlParams.get('ref');
+
+    if (refCode) {
+      sessionStorage.setItem('pending_ref_code', refCode);
+    }
+
+    redirectToLogin(createPageUrl("Landing"));
   };
 
   const handleSignIn = () => {
-    base44.auth.redirectToLogin(createPageUrl("Dashboard"));
+    redirectToLogin(createPageUrl("Dashboard"));
   };
 
   return (
     <div className="min-h-screen">
-      <style>
-        {`
-          /* Hide Base44 developer widget */
-          [class*="base44-widget"],
-          [class*="base44-editor"],
-          [id*="base44-widget"],
-          [id*="base44-editor"] {
-            display: none !important;
-            visibility: hidden !important;
-            opacity: 0 !important;
-            pointer-events: none !important;
-          }
-        `}
-      </style>
 
       {/* Navigation */}
       <nav className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">

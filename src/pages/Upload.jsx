@@ -1,6 +1,5 @@
 
 import React, { useState, useRef, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Upload, FileText, ArrowLeft, Loader2 } from "lucide-react";
@@ -10,6 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { differenceInDays } from "date-fns";
 
 import ContractForm from "../components/upload/ContractForm";
+import { getCurrentProfile, updateProfile, fetchContracts, createContract, redirectToLogin, uploadContractFile, extractContractData, verifyContractData, summarizeContract } from "@/api/services";
 
 export default function UploadPage() {
   const navigate = useNavigate();
@@ -86,22 +86,26 @@ export default function UploadPage() {
         calculateLimitsFromUser(userData);
       }
       
-      const verifiedUserData = await base44.auth.me();
+      const verifiedUserData = await getCurrentProfile();
       if (!verifiedUserData) {
-        base44.auth.redirectToLogin(window.location.pathname);
+        redirectToLogin(window.location.pathname);
         return;
       }
       loadData();
     } catch (error) {
       console.error("Auth error:", error);
-      base44.auth.redirectToLogin(window.location.pathname);
+      redirectToLogin(window.location.pathname);
       sessionStorage.removeItem('user_data');
     }
   };
 
   const loadData = async () => {
     try {
-      let userData = await base44.auth.me();
+      let userData = await getCurrentProfile();
+      if (!userData) {
+        redirectToLogin(window.location.pathname);
+        return;
+      }
       
       sessionStorage.setItem('user_data', JSON.stringify(userData));
 
@@ -113,14 +117,13 @@ export default function UploadPage() {
         endDate.setDate(endDate.setDate(today.getDate() + 60)); // 60 days trial
         const trialEndDate = endDate.toISOString().split('T')[0];
         
-        await base44.auth.updateMe({
+        userData = await updateProfile({
           trial_start_date: trialStartDate,
           trial_end_date: trialEndDate,
           contracts_used_this_month: 0,
           monthly_reset_date: today.toISOString().split('T')[0]
         });
         
-        userData = await base44.auth.me(); 
         sessionStorage.setItem('user_data', JSON.stringify(userData));
       }
       
@@ -128,11 +131,10 @@ export default function UploadPage() {
       const lastResetDate = userData.monthly_reset_date ? new Date(userData.monthly_reset_date) : null;
       
       if (lastResetDate && (lastResetDate.getMonth() !== today.getMonth() || lastResetDate.getFullYear() !== today.getFullYear())) {
-        await base44.auth.updateMe({
+        userData = await updateProfile({
           contracts_used_this_month: 0,
           monthly_reset_date: today.toISOString().split('T')[0]
         });
-        userData = await base44.auth.me();
         sessionStorage.setItem('user_data', JSON.stringify(userData));
       }
 
@@ -155,7 +157,7 @@ export default function UploadPage() {
       if (userData.subscription_tier === 'beta' || userData.subscription_tier === 'team_beta') { // Beta users never see upgrade prompt
         shouldShowUpgrade = false; 
       } else if (userData.subscription_tier === 'trial') {
-        const contracts = await base44.entities.Contract.list();
+        const contracts = await fetchContracts();
         const daysElapsed = userData.trial_start_date ? differenceInDays(today, new Date(userData.trial_start_date)) : 0;
         
         const trialEndDate = userData.trial_end_date ? new Date(userData.trial_end_date) : null;
@@ -259,13 +261,8 @@ export default function UploadPage() {
 
     try {
       console.log("Uploading file securely...");
-      const { data: uploadResult } = await base44.functions.invoke('secureUpload', { file: selectedFile });
-      
-      if (!uploadResult.success) {
-        throw new Error(uploadResult.error || "Upload failed");
-      }
-      
-      const file_url = uploadResult.file_url;
+      const uploadResult = await uploadContractFile(selectedFile, 'contracts');
+      const file_url = uploadResult.publicUrl;
       console.log("File uploaded securely:", file_url);
 
       // Define Contract schema inline with detailed descriptions
@@ -296,7 +293,7 @@ export default function UploadPage() {
       console.log("Extracting contract data with AI...");
       
       // First pass: Extract all data including contact info
-      const extractResult = await base44.integrations.Core.ExtractDataFromUploadedFile({
+      const extractResult = await extractContractData({
         file_url,
         json_schema: contractSchema
       });
@@ -306,7 +303,7 @@ export default function UploadPage() {
         console.log("Verifying dates and contact information...");
         
         // Enhanced verification with focus on contact info
-        const verification = await base44.integrations.Core.InvokeLLM({
+        const verification = await verifyContractData({
           prompt: `You are a real estate contract data extractor. Your job is to verify ALL information with 100% accuracy.
 
 CRITICAL RULES:
@@ -373,8 +370,9 @@ Return in this format:
         });
 
         console.log("Generating summary...");
-        const summary = await base44.integrations.Core.InvokeLLM({
+        const summary = await summarizeContract({
           prompt: `You are reviewing a real estate contract. Summarize the key terms in 2-3 simple, clear sentences that a homebuyer would understand. Focus on: purchase price, important dates, and any special conditions. Here's the contract data: ${JSON.stringify(verifiedData)}`,
+          file_urls: [file_url]
         });
 
         setExtractedData({
@@ -406,7 +404,7 @@ Return in this format:
   const handleSave = async (contractData) => {
     setIsProcessing(true);
     try {
-      await base44.entities.Contract.create(contractData);
+      await createContract(contractData);
       
       // Exclude 'team', 'beta', and 'team_beta' from contract count increment
       if (user && user.subscription_tier !== 'team' && user.subscription_tier !== 'beta' && user.subscription_tier !== 'team_beta') { 
@@ -415,7 +413,7 @@ Return in this format:
         setUser(updatedUser);
         sessionStorage.setItem('user_data', JSON.stringify(updatedUser));
 
-        await base44.auth.updateMe({
+        await updateProfile({
           contracts_used_this_month: updatedContractsUsed
         });
       }

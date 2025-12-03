@@ -4,7 +4,7 @@ import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { LayoutDashboard, Upload, Calendar, FileText, LogOut, Archive, Send } from "lucide-react";
-import { base44 } from "@/api/base44Client";
+import { getCurrentProfile, isAuthenticated, redirectToLogin, signOutUser } from "@/api/services";
 import {
   Sidebar,
   SidebarContent,
@@ -111,18 +111,23 @@ export default function Layout({ children, currentPageName }) {
       }
       
       // Check if authenticated first
-      const isAuth = await base44.auth.isAuthenticated();
-      console.log("🔐 Is authenticated:", isAuth);
+      const authStatus = await isAuthenticated();
+      console.log("🔐 Is authenticated:", authStatus);
       
-      if (!isAuth) {
+      if (!authStatus) {
         console.log("❌ Not authenticated, redirecting to login");
         sessionStorage.removeItem('user_data');
-        base44.auth.redirectToLogin(window.location.pathname);
+        redirectToLogin(window.location.pathname);
         return;
       }
       
       // Then fetch fresh data
-      const userData = await base44.auth.me();
+      const userData = await getCurrentProfile();
+      if (!userData) {
+        sessionStorage.removeItem('user_data');
+        redirectToLogin(window.location.pathname);
+        return;
+      }
       console.log("✅ User data loaded:", userData.email);
       setUser(userData);
       sessionStorage.setItem('user_data', JSON.stringify(userData));
@@ -141,7 +146,7 @@ export default function Layout({ children, currentPageName }) {
       
       // Redirect to login after a short delay to show error
       setTimeout(() => {
-        base44.auth.redirectToLogin(window.location.pathname);
+        redirectToLogin(window.location.pathname);
       }, 2000);
     }
   };
@@ -150,43 +155,12 @@ export default function Layout({ children, currentPageName }) {
     sessionStorage.removeItem('user_data'); // Clear cache on logout
     sessionStorage.removeItem('contracts_cache'); // Clear contracts cache
     sessionStorage.removeItem('contracts_cache_time'); // Clear contracts cache time
-    await base44.auth.logout();
+    await signOutUser('/');
   };
 
   // If it's a public page, just render children without sidebar or auth
   if (isPublicPage) {
-    return (
-      <>
-        <style>
-          {`
-            /* GLOBAL: Hide Base44 developer widget from ALL pages */
-            [class*="base44" i],
-            [id*="base44" i],
-            [class*="editor" i],
-            [class*="widget" i],
-            div[style*="position: fixed"][style*="bottom"],
-            div[style*="position: fixed"][style*="right"],
-            button[title*="base44" i],
-            button[title*="edit" i],
-            iframe[src*="base44" i],
-            a[href*="base44.app" i],
-            a[href*="base44.com" i] {
-              display: none !important;
-              visibility: hidden !important;
-              opacity: 0 !important;
-              pointer-events: none !important;
-              width: 0 !important;
-              height: 0 !important;
-              position: absolute !important;
-              left: -99999px !important;
-              top: -99999px !important;
-              z-index: -1 !important;
-            }
-          `}
-        </style>
-        {children}
-      </>
-    );
+    return children;
   }
 
   // Show auth error if exists
@@ -208,42 +182,6 @@ export default function Layout({ children, currentPageName }) {
   // Otherwise, render with sidebar (authenticated pages)
   return (
     <SidebarProvider>
-      <style>
-        {`
-          :root {
-            --primary-navy: #1e3a5f;
-            --primary-gold: #c9a961;
-            --accent-blue: #2563eb;
-            --text-dark: #1f2937;
-            --text-light: #6b7280;
-            --bg-light: #f9fafb;
-          }
-
-          /* GLOBAL: Hide Base44 widgets */
-          [class*="base44" i],
-          [id*="base44" i],
-          [class*="editor" i],
-          [class*="widget" i],
-          div[style*="position: fixed"][style*="bottom"],
-          div[style*="position: fixed"][style*="right"],
-          button[title*="base44" i],
-          button[title*="edit" i],
-          iframe[src*="base44" i],
-          a[href*="base44.app" i],
-          a[href*="base44.com" i] {
-            display: none !important;
-            visibility: hidden !important;
-            opacity: 0 !important;
-            pointer-events: none !important;
-            width: 0 !important;
-            height: 0 !important;
-            position: absolute !important;
-            left: -99999px !important;
-            top: -99999px !important;
-            z-index: -1 !important;
-          }
-        `}
-      </style>
       <div className="min-h-screen flex w-full bg-gray-50">
         <Sidebar className="border-r border-gray-200 bg-white">
           <SidebarHeader className="border-b border-gray-100 p-6">

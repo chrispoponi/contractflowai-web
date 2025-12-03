@@ -1,12 +1,12 @@
 
 import React, { useState, useEffect, useCallback } from "react";
-import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { Button } from "@/components/ui/button";
 import { Plus, TrendingUp, Clock } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { CreditCard } from "lucide-react";
+import { getCurrentProfile, updateProfile, fetchContracts, processReferral, redirectToLogin } from "@/api/services";
 
 import StatsOverview from "../components/dashboard/StatsOverview";
 import ContractsList from "../components/dashboard/ContractsList";
@@ -32,23 +32,20 @@ export default function Dashboard() {
         setUser(JSON.parse(cachedUser));
       }
       
-      const userData = await base44.auth.me();
+      const userData = await getCurrentProfile();
       if (!userData) {
-        base44.auth.redirectToLogin(window.location.pathname);
         sessionStorage.removeItem('user_data');
+        redirectToLogin(window.location.pathname);
         return;
       }
       
       setUser(userData);
       sessionStorage.setItem('user_data', JSON.stringify(userData));
 
-      // Check for pending referral code (support both 'code' and 'ref_code')
       const pendingRefCode = sessionStorage.getItem('pending_ref_code');
       if (pendingRefCode) {
         try {
-          await base44.functions.invoke('processReferral', {
-            code: pendingRefCode
-          });
+          await processReferral({ code: pendingRefCode });
           console.log("✅ Referral processed");
           sessionStorage.removeItem('pending_ref_code');
         } catch (refError) {
@@ -60,7 +57,7 @@ export default function Dashboard() {
     } catch (error) {
       console.error("Auth error:", error);
       sessionStorage.removeItem('user_data');
-      base44.auth.redirectToLogin(window.location.pathname);
+      redirectToLogin(window.location.pathname);
     }
   };
 
@@ -133,10 +130,10 @@ export default function Dashboard() {
       let userData = currentUserData;
       if (!userData) {
           console.warn("loadData called without user data, fetching it again.");
-          userData = await base44.auth.me();
+          userData = await getCurrentProfile();
           if (!userData) {
               console.error("No user data available for loadData, redirecting.");
-              base44.auth.redirectToLogin(window.location.pathname);
+              redirectToLogin(window.location.pathname);
               setIsLoading(false);
               return;
           }
@@ -147,12 +144,12 @@ export default function Dashboard() {
       if (betaTesters.includes(userData.email)) {
         if (userData.subscription_status !== 'active' || userData.subscription_tier !== 'professional' || userData.organization_role !== 'admin') {
           console.log(`Auto-upgrading ${userData.email} to professional active subscription.`);
-          await base44.auth.updateMe({
+          userData = await updateProfile({
             subscription_tier: 'professional',
             subscription_status: 'active',
             organization_role: userData.email === 'chrispoponi@gmail.com' ? 'admin' : 'team_lead'
           });
-          userData = await base44.auth.me();
+          sessionStorage.setItem('user_data', JSON.stringify(userData));
         }
       }
       
@@ -165,26 +162,20 @@ export default function Dashboard() {
         endDate.setDate(endDate.getDate() + 60);
         const trialEndDate = endDate.toISOString().split('T')[0];
         
-        await base44.auth.updateMe({
+        userData = await updateProfile({
           trial_start_date: trialStartDate,
           trial_end_date: trialEndDate,
           contracts_used_this_month: 0,
           monthly_reset_date: today.toISOString().split('T')[0]
         });
-        
-        userData = { 
-          ...userData, 
-          trial_start_date: trialStartDate,
-          trial_end_date: trialEndDate,
-          contracts_used_this_month: 0,
-          monthly_reset_date: today.toISOString().split('T')[0]
-        };
+
+        sessionStorage.setItem('user_data', JSON.stringify(userData));
       }
       
       // Fetch contracts
       let allContracts = [];
       try {
-        allContracts = await base44.entities.Contract.list("-created_date");
+        allContracts = await fetchContracts("-created_date");
         console.log("✅ Contracts loaded:", allContracts.length);
       } catch (contractError) {
         console.error("❌ Error loading contracts:", contractError);
@@ -243,7 +234,7 @@ export default function Dashboard() {
       
     } catch (error) {
       console.error("Error loading data:", error);
-      base44.auth.redirectToLogin(window.location.pathname);
+      redirectToLogin(window.location.pathname);
     }
     setIsLoading(false);
   };

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { getCurrentProfile, fetchContracts, updateContract, generateClientTimeline, redirectToLogin } from "@/api/services";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -112,9 +112,9 @@ export default function ContractDetailsPage() {
         // Assume cached user is valid, proceed
         loadContract();
       } else {
-        const userData = await base44.auth.me();
+        const userData = await getCurrentProfile();
         if (!userData) {
-          base44.auth.redirectToLogin(window.location.pathname);
+          redirectToLogin(window.location.pathname);
           return;
         }
         sessionStorage.setItem('user_data', JSON.stringify(userData)); // Cache user data
@@ -123,7 +123,7 @@ export default function ContractDetailsPage() {
     } catch (error) {
       console.error("Auth error:", error);
       sessionStorage.removeItem('user_data'); // Clear potentially stale cache
-      base44.auth.redirectToLogin(window.location.pathname);
+      redirectToLogin(window.location.pathname);
     }
   };
 
@@ -161,7 +161,7 @@ export default function ContractDetailsPage() {
     
     // Fetch fresh data in background (or if no cache was hit)
     try {
-      const freshContracts = await base44.entities.Contract.list();
+      const freshContracts = await fetchContracts();
       sessionStorage.setItem('contracts_cache', JSON.stringify(freshContracts)); // Update cache
       
       const freshFoundContract = freshContracts.find(c => c.id === contractId);
@@ -199,25 +199,25 @@ export default function ContractDetailsPage() {
   };
 
   const handleSaveEdit = async (updatedData) => {
-    await base44.entities.Contract.update(contract.id, updatedData);
+    await updateContract(contract.id, updatedData);
     
     // Invalidate cache after update
     sessionStorage.removeItem('contracts_cache');
 
     if (updatedData.all_parties_signed && contract.is_counter_offer && contract.original_contract_id) {
-      await base44.entities.Contract.update(contract.original_contract_id, { status: "superseded" });
+      await updateContract(contract.original_contract_id, { status: "superseded" });
       
       // Invalidate cache after update
       sessionStorage.removeItem('contracts_cache');
 
-      const allContracts = await base44.entities.Contract.list(); // Re-fetch to get latest states
+      const allContracts = await fetchContracts(); // Re-fetch to get latest states
       const otherCounters = allContracts.filter(c => 
         c.original_contract_id === contract.original_contract_id && 
         c.id !== contract.id
       );
       
       for (const other of otherCounters) {
-        await base44.entities.Contract.update(other.id, { status: "superseded" });
+        await updateContract(other.id, { status: "superseded" });
       }
     }
     
@@ -226,7 +226,7 @@ export default function ContractDetailsPage() {
   };
 
   const handleCancelContract = async (reason, notes) => {
-    await base44.entities.Contract.update(contract.id, {
+    await updateContract(contract.id, {
       status: "cancelled",
       cancellation_reason: reason,
       cancellation_notes: notes,
@@ -246,9 +246,9 @@ export default function ContractDetailsPage() {
       console.log("📧 Send to client:", sendToClient);
       console.log("👤 Client email:", contract.representing_side === 'buyer' ? contract.buyer_email : contract.seller_email);
       
-      const response = await base44.functions.invoke('generateClientTimeline', {
+      const response = await generateClientTimeline({
         contractId: contract.id,
-        sendToClient: sendToClient
+        sendToClient
       });
 
       console.log("✅ Function response:", response);
@@ -257,9 +257,9 @@ export default function ContractDetailsPage() {
         const clientName = contract.representing_side === 'buyer' ? contract.buyer_name : contract.seller_name;
         alert(`✅ Timeline emailed to ${clientName || 'your client'}!`);
       } else {
-        // Download PDF
-        const contentType = response.headers?.['content-type'] || 'application/pdf';
-        const blob = new Blob([response.data], { type: contentType });
+        const timelinePayload = response?.data ?? response;
+        const contentType = response?.contentType || response?.headers?.['content-type'] || 'application/pdf';
+        const blob = timelinePayload instanceof Blob ? timelinePayload : new Blob([timelinePayload], { type: contentType });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -759,7 +759,7 @@ export default function ContractDetailsPage() {
                               if (field === "closing_completed") {
                                 updates.status = "closed";
                               }
-                              await base44.entities.Contract.update(contract.id, updates);
+                              await updateContract(contract.id, updates);
                               sessionStorage.removeItem('contracts_cache'); // Invalidate cache
                               loadContract();
                             }}

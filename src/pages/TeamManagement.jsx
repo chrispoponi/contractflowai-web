@@ -1,6 +1,5 @@
 
 import React, { useState } from "react";
-import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { getCurrentProfile, fetchOrganizations, fetchUsers, updateUserById, deleteUserById, redirectToLogin } from "@/api/services";
 
 export default function TeamManagementPage() {
   const [user, setUser] = React.useState(null);
@@ -31,15 +31,15 @@ export default function TeamManagementPage() {
 
   const checkAuthAndLoadData = async () => {
     try {
-      const userData = await base44.auth.me();
+      const userData = await getCurrentProfile();
       if (!userData) {
-        base44.auth.redirectToLogin(window.location.pathname);
+        redirectToLogin(window.location.pathname);
         return;
       }
       loadData();
     } catch (error) {
       console.error("Auth error:", error);
-      base44.auth.redirectToLogin(window.location.pathname);
+      redirectToLogin(window.location.pathname);
     }
   };
 
@@ -48,7 +48,7 @@ export default function TeamManagementPage() {
     setError(null);
     
     try {
-      const userData = await base44.auth.me();
+      const userData = await getCurrentProfile();
       setUser(userData);
 
       // Check if user has permission to manage team
@@ -70,12 +70,12 @@ export default function TeamManagementPage() {
         // Admins can see everything
         if (isAdmin) {
           try {
-            allOrgs = await base44.entities.Organization.list();
-            allUsers = await base44.entities.User.list();
+            allOrgs = await fetchOrganizations();
+            allUsers = await fetchUsers();
           } catch (err) {
             console.error("Admin list error:", err);
             // If Organization entity doesn't exist yet, just show users
-            allUsers = await base44.entities.User.list();
+            allUsers = await fetchUsers();
             allOrgs = [];
           }
           
@@ -90,8 +90,8 @@ export default function TeamManagementPage() {
         } else if (isTeamLead && userData.organization_id) {
           // Team leads can only see their org
           try {
-            allOrgs = await base44.entities.Organization.list();
-            allUsers = await base44.entities.User.list();
+            allOrgs = await fetchOrganizations();
+            allUsers = await fetchUsers();
             
             const myOrg = allOrgs.find(o => o.id === userData.organization_id);
             setOrganization(myOrg);
@@ -129,7 +129,7 @@ export default function TeamManagementPage() {
         return;
       }
 
-      const allUsers = await base44.entities.User.list();
+      const allUsers = await fetchUsers();
       const existingUser = allUsers.find(u => u.email === inviteEmail);
 
       if (existingUser && existingUser.organization_id) {
@@ -155,7 +155,7 @@ export default function TeamManagementPage() {
     setSuccess(null);
 
     try {
-      await base44.entities.User.update(member.id, {
+      await updateUserById(member.id, {
         organization_id: null,
         organization_role: "member",
         subscription_tier: "trial"
@@ -183,7 +183,7 @@ export default function TeamManagementPage() {
     setSuccess(null);
 
     try {
-      await base44.entities.User.delete(member.id);
+      await deleteUserById(member.id);
       setSuccess(`User ${member.full_name} has been permanently deleted`);
       await loadData();
     } catch (err) {

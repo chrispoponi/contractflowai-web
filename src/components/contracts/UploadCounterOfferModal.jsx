@@ -1,6 +1,5 @@
 
 import React, { useState, useRef } from "react";
-import { base44 } from "@/api/base44Client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,6 +7,7 @@ import { Upload, FileText, Loader2, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 import ContractForm from "../upload/ContractForm";
+import { uploadContractFile, extractContractData, summarizeContract, createContract } from "@/api/services";
 
 export default function UploadCounterOfferModal({ originalContractId, existingCounterOffers, onClose, onSuccess }) {
   const [file, setFile] = useState(null);
@@ -55,13 +55,8 @@ export default function UploadCounterOfferModal({ originalContractId, existingCo
     setError(null);
 
     try {
-      const { data: uploadResult } = await base44.functions.invoke('secureUpload', { file: selectedFile });
-      
-      if (!uploadResult.success) {
-        throw new Error(uploadResult.error || "Upload failed");
-      }
-      
-      const file_url = uploadResult.file_url;
+      const uploadResult = await uploadContractFile(selectedFile, 'counter-offers');
+      const file_url = uploadResult.publicUrl;
 
       // Define Contract schema inline
       const contractSchema = {
@@ -90,14 +85,15 @@ export default function UploadCounterOfferModal({ originalContractId, existingCo
         }
       };
 
-      const extractResult = await base44.integrations.Core.ExtractDataFromUploadedFile({
+      const extractResult = await extractContractData({
         file_url,
         json_schema: contractSchema
       });
 
       if (extractResult.status === "success" && extractResult.output) {
-        const summary = await base44.integrations.Core.InvokeLLM({
+        const summary = await summarizeContract({
           prompt: `You are reviewing a real estate counter offer. Summarize the key terms in 2-3 simple, clear sentences that a homebuyer would understand. Focus on: purchase price, important dates, and any special conditions. Here's the contract data: ${JSON.stringify(extractResult.output)}`,
+          file_urls: [file_url]
         });
 
         setExtractedData({
@@ -123,7 +119,7 @@ export default function UploadCounterOfferModal({ originalContractId, existingCo
   const handleSave = async (contractData) => {
     setIsProcessing(true);
     try {
-      await base44.entities.Contract.create(contractData);
+      await createContract(contractData);
       onSuccess();
       onClose();
     } catch (err) {
