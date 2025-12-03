@@ -14,22 +14,34 @@ export type Database = {
           id: string
           email: string | null
           full_name: string | null
+          role: string | null
+          subscription_tier: string | null
           subscription_status: string | null
           subscription_expires_at: string | null
+          trial_end_date: string | null
+          subscription_notes: string | null
+          stripe_customer_id: string | null
           email_notifications_enabled: boolean
           reminder_inspection_days: number[] | null
           reminder_closing_days: number[] | null
           created_at: string
+          updated_at: string | null
         }
         Insert: {
           id: string
           email?: string | null
           full_name?: string | null
+          role?: string | null
+          subscription_tier?: string | null
           subscription_status?: string | null
           subscription_expires_at?: string | null
+          trial_end_date?: string | null
+          subscription_notes?: string | null
+          stripe_customer_id?: string | null
           email_notifications_enabled?: boolean
           reminder_inspection_days?: number[] | null
           reminder_closing_days?: number[] | null
+          updated_at?: string | null
         }
         Update: Partial<Database['public']['Tables']['users']['Insert']>
       }
