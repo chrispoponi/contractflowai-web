@@ -1,15 +1,17 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { fileURLToPath, URL } from 'node:url'
+import path from 'node:path'
 
+// Basic Vite + React + TS config with @ alias.
+// No reading of ../../package.json, so no more JSON error.
 export default defineConfig({
   plugins: [react()],
-  server: {
-    allowedHosts: true
-  },
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url))
+      '@': path.resolve(__dirname, './src')
     }
+  },
+  server: {
+    port: 5173
   }
 })

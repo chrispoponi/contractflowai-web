@@ -14,10 +14,10 @@ export default function Landing() {
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Button asChild>
-            <Link to="/auth/register">Create account</Link>
+            <Link to="/pricing">Start for free</Link>
           </Button>
           <Button variant="outline" asChild>
-            <Link to="/pricing">View pricing</Link>
+            <Link to="/login">Already using ContractFlowAI?</Link>
           </Button>
         </div>
       </div>

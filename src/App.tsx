@@ -13,7 +13,6 @@ import ArchivedContracts from '@/pages/ArchivedContracts'
 import BrokerageSettings from '@/pages/BrokerageSettings'
 import Landing from '@/pages/Landing'
 import TeamManagement from '@/pages/Teams'
-import Home from '@/pages/Home'
 import DebugReminders from '@/pages/DebugReminders'
 import ClientUpdates from '@/pages/ClientUpdates'
 import Referrals from '@/pages/Referrals'
@@ -41,8 +40,10 @@ function App() {
         <Route path="/auth/signup" element={<AuthSignup />} />
         <Route path="/auth/forgot-password" element={<AuthReset />} />
         <Route path="/auth/reset-password" element={<AuthReset />} />
+        <Route path="/" element={<Landing />} />
         <Route path="/landing" element={<Landing />} />
-        <Route path="/" element={<Home />} />
+        <Route path="/pricing" element={<Pricing />} />
+        <Route path="/privacy" element={<Privacy />} />
         <Route
           element={
             <ProtectedRoute>
@@ -55,10 +56,8 @@ function App() {
           <Route path="/calendar" element={<Calendar />} />
           <Route path="/contracts/:contractId" element={<ContractDetails />} />
           <Route path="/contracts/:contractId/counter-offer" element={<UploadCounterOffer />} />
-          <Route path="/pricing" element={<Pricing />} />
           <Route path="/admin/subscriptions" element={<AdminSubscriptions />} />
           <Route path="/reminders" element={<ReminderSettings />} />
-          <Route path="/privacy" element={<Privacy />} />
           <Route path="/contracts/archived" element={<ArchivedContracts />} />
           <Route path="/settings/brokerage" element={<BrokerageSettings />} />
           <Route path="/teams" element={<TeamManagement />} />
