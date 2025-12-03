@@ -1,23 +1,12 @@
 import type { ReactNode } from 'react'
-import { Navigate, useLocation } from 'react-router-dom'
-import { useAuth } from '@/components/providers/AuthProvider'
-import { Spinner } from '@/components/ui/spinner'
+import { Navigate } from 'react-router-dom'
+import { useSupabaseSession } from '@/hooks/useSupabaseSession'
 
-export function ProtectedRoute({ children }: { children: ReactNode }) {
-  const { user, loading } = useAuth()
-  const location = useLocation()
+export default function ProtectedRoute({ children }: { children: ReactNode }) {
+  const { session, loading } = useSupabaseSession()
 
-  if (loading) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-slate-50">
-        <Spinner />
-      </div>
-    )
-  }
-
-  if (!user) {
-    return <Navigate to="/auth/login" state={{ from: location }} replace />
-  }
+  if (loading) return null
+  if (!session) return <Navigate to="/login" replace />
 
   return <>{children}</>
 }

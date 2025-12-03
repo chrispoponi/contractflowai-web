@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/components/providers/AuthProvider'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase/client'
 import type { TablesInsert } from '@/lib/supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -28,7 +28,7 @@ const initialState: UploadFormState = {
   notes: ''
 }
 
-export default function Upload() {
+export default function EditContract() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const { toast } = useToast()
@@ -67,7 +67,7 @@ export default function Upload() {
       }
 
       const payload: TablesInsert<'contracts'> = {
-        owner_id: user.id,
+        user_id: user.id,
         title: form.title || file.name,
         property_address: form.property_address,
         client_name: form.client_name,
@@ -92,7 +92,7 @@ export default function Upload() {
         body: {
           contractId: newContract.id,
           storagePath,
-          ownerId: user.id
+          userId: user.id
         }
       })
 

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase/client'
 import type { Tables } from '@/lib/supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -14,6 +14,7 @@ import CancelContractModal from '@/components/contracts/CancelContractModal'
 import TransactionChecklist from '@/components/contracts/TransactionChecklist'
 import { Separator } from '@/components/ui/separator'
 import { ExternalLink, FileText, Loader2 } from 'lucide-react'
+import { fetchContract, listCounterOffers, updateContract as updateContractRecord } from '@/lib/supabase/queries/contracts'
 
 const statusColors: Record<string, string> = {
   pending: 'bg-slate-100 text-slate-700',
@@ -46,40 +47,19 @@ export default function ContractDetails() {
   } = useQuery({
     queryKey: ['contract', contractId],
     enabled: Boolean(contractId && user?.id),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('contracts')
-        .select('*')
-        .eq('id', contractId!)
-        .eq('owner_id', user!.id)
-        .single()
-      if (error) throw error
-      return data as Contract
-    }
+    queryFn: () => fetchContract(contractId!, user!.id)
   })
 
   const { data: counterOffers = [] } = useQuery({
     queryKey: ['counterOffers', contractId],
     enabled: Boolean(contractId && user?.id),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('contracts')
-        .select('*')
-        .eq('parent_contract_id', contractId!)
-        .order('created_at', { ascending: false })
-      if (error) throw error
-      return data as Contract[]
-    }
+    queryFn: () => listCounterOffers(contractId!)
   })
 
   const updateMutation = useMutation({
     mutationFn: async (updates: TablesUpdate<'contracts'>) => {
       if (!contractId) return
-      const { error } = await supabase
-        .from('contracts')
-        .update({ ...updates, updated_at: new Date().toISOString() })
-        .eq('id', contractId)
-      if (error) throw error
+      await updateContractRecord(contractId, { ...updates, updated_at: new Date().toISOString() })
     },
     onSuccess: async () => {
       await Promise.all([
@@ -188,7 +168,7 @@ export default function ContractDetails() {
               size="sm"
               onClick={() => {
                 void supabase.functions
-                  .invoke('generateClientTimeline', { body: { contractId: contract.id, ownerId: user?.id } })
+                  .invoke('generateClientTimeline', { body: { contractId: contract.id, userId: user?.id } })
                   .then(() => toast({ title: 'Timeline requested' }))
                   .catch((error) => toast({ title: 'Timeline error', description: error.message, variant: 'destructive' }))
               }}
@@ -264,6 +244,7 @@ export default function ContractDetails() {
       <UploadCounterOfferModal
         contractId={contract.id}
         counterOfferCount={counterOffers.length}
+        userId={user!.id}
         open={counterOfferOpen}
         onClose={() => setCounterOfferOpen(false)}
         onUploaded={async () => {

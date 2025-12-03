@@ -10,13 +10,13 @@ const supabase = createClient<Database>(
 
 serve(async (req) => {
   try {
-    const { ownerId } = await req.json()
-    if (!ownerId) return new Response(JSON.stringify({ error: 'ownerId required' }), { status: 400 })
+    const { userId } = await req.json()
+    if (!userId) return new Response(JSON.stringify({ error: 'userId required' }), { status: 400 })
 
     const { data: contracts } = await supabase
       .from('contracts')
       .select('id, referral_source')
-      .eq('owner_id', ownerId)
+      .eq('user_id', userId)
 
     const enriched = (contracts ?? []).map((contract) => ({
       id: contract.id,

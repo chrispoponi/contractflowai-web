@@ -3,11 +3,12 @@ import { UploadCloud, CheckCircle2 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase/client'
 
 interface UploadCounterOfferModalProps {
   contractId: string
   counterOfferCount: number
+  userId: string
   open: boolean
   onClose: () => void
   onUploaded: () => void
@@ -16,6 +17,7 @@ interface UploadCounterOfferModalProps {
 export default function UploadCounterOfferModal({
   contractId,
   counterOfferCount,
+  userId,
   open,
   onClose,
   onUploaded
@@ -48,7 +50,8 @@ export default function UploadCounterOfferModal({
         body: {
           contractId,
           storagePath,
-          fileName: file.name
+          fileName: file.name,
+          userId
         }
       })
 

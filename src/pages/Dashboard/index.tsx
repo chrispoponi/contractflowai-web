@@ -4,12 +4,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/components/providers/AuthProvider'
-import { supabase } from '@/lib/supabase'
 import type { Tables } from '@/lib/supabase'
 import { useToast } from '@/components/ui/use-toast'
 import StatsOverview from '@/components/dashboard/StatsOverview'
 import ContractsList from '@/components/dashboard/ContractsList'
 import UpcomingDates, { type UpcomingEvent } from '@/components/dashboard/UpcomingDates'
+import { supabase } from '@/lib/supabase/client'
+import { listContracts } from '@/lib/supabase/queries/contracts'
+import { formatCurrency } from '@/utils/formatters'
 
 const MAX_EVENTS = 5
 
@@ -27,21 +29,13 @@ export default function Dashboard() {
   } = useQuery({
     queryKey: ['contracts', user?.id],
     enabled: Boolean(user?.id),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('contracts')
-        .select('*')
-        .eq('owner_id', user!.id)
-        .order('created_at', { ascending: false })
-      if (error) throw error
-      return data as Contract[]
-    }
+    queryFn: () => listContracts(user!.id)
   })
 
   const timelineMutation = useMutation({
     mutationFn: async (contractId: string) => {
       await supabase.functions.invoke('generateClientTimeline', {
-        body: { contractId, ownerId: user?.id }
+        body: { contractId, userId: user?.id }
       })
     },
     onSuccess: () => {
@@ -56,7 +50,7 @@ export default function Dashboard() {
   const referralSync = useMutation({
     mutationFn: async () => {
       await supabase.functions.invoke('referralSystem', {
-        body: { ownerId: user?.id }
+        body: { userId: user?.id }
       })
     },
     onSuccess: () => {
@@ -171,7 +165,7 @@ export default function Dashboard() {
         />
         <StatsOverview
           title="Pipeline volume"
-          value={stats.pipeline ? `$${stats.pipeline.toLocaleString()}` : '$0'}
+          value={formatCurrency(stats.pipeline)}
           icon={Sparkles}
           color="gold"
           isLoading={isLoading}

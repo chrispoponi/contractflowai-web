@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
 import type { Tables } from '@/lib/supabase'
 import { useAuth } from '@/components/providers/AuthProvider'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
+import { listTeams, createTeam as createTeamRecord } from '@/lib/supabase/queries/teams'
 
 interface TeamWithMembers extends Tables<'teams'> {
   team_members?: Tables<'team_members'>[]
@@ -21,22 +21,13 @@ export default function TeamManagement() {
   const { data: teams = [] } = useQuery({
     queryKey: ['teams', user?.id],
     enabled: Boolean(user?.id),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('teams')
-        .select('*, team_members(*)')
-        .eq('owner_id', user!.id)
-      if (error) throw error
-      return data as TeamWithMembers[]
-    }
+    queryFn: () => listTeams(user!.id)
   })
 
   const createTeam = useMutation({
     mutationFn: async () => {
       if (!teamName.trim()) throw new Error('Team name required')
-      await supabase
-        .from('teams')
-        .insert({ name: teamName, owner_id: user!.id })
+      await createTeamRecord({ name: teamName, owner_id: user!.id })
     },
     onSuccess: () => {
       setTeamName('')

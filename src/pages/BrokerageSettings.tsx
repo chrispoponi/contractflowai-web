@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/components/providers/AuthProvider'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'

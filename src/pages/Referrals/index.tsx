@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/components/providers/AuthProvider'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
-import type { Tables } from '@/lib/supabase'
+import { listReferrals, attachReferral as attachReferralRecord } from '@/lib/supabase/queries/referrals'
+import { toDisplayDate } from '@/utils/dates'
 
 export default function Referrals() {
   const { user } = useAuth()
@@ -18,24 +19,13 @@ export default function Referrals() {
   const { data: referrals = [] } = useQuery({
     queryKey: ['referrals', user?.id],
     enabled: Boolean(user?.id),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('contracts')
-        .select('id, title, referral_source, created_at')
-        .eq('owner_id', user!.id)
-        .not('referral_source', 'is', null)
-      if (error) throw error
-      return data as Pick<Tables<'contracts'>, 'id' | 'title' | 'referral_source' | 'created_at'>[]
-    }
+    queryFn: () => listReferrals(user!.id)
   })
 
   const attachReferral = useMutation({
     mutationFn: async () => {
       if (!contractId || !source.trim()) throw new Error('Contract and source required')
-      await supabase
-        .from('contracts')
-        .update({ referral_source: source })
-        .eq('id', contractId)
+      await attachReferralRecord(contractId, { referral_source: source })
     },
     onSuccess: () => {
       toast({ title: 'Referral saved' })
@@ -48,7 +38,7 @@ export default function Referrals() {
 
   const syncPartners = useMutation({
     mutationFn: async () => {
-      await supabase.functions.invoke('referralSystem', { body: { ownerId: user?.id } })
+      await supabase.functions.invoke('referralSystem', { body: { userId: user?.id } })
     },
     onSuccess: () => toast({ title: 'Referral sync queued' }),
     onError: (error) => toast({ title: 'Sync failed', description: error.message, variant: 'destructive' })
@@ -83,7 +73,7 @@ export default function Referrals() {
             <div key={referral.id} className="rounded-2xl border border-slate-200 p-3 text-sm">
               <p className="font-semibold text-slate-900">{referral.referral_source}</p>
               <p className="text-slate-500">{referral.title}</p>
-              <p className="text-xs text-slate-400">Added {new Date(referral.created_at).toLocaleDateString()}</p>
+              <p className="text-xs text-slate-400">Added {toDisplayDate(referral.created_at)}</p>
             </div>
           ))}
         </CardContent>

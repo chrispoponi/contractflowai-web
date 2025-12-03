@@ -1,12 +1,11 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/components/providers/AuthProvider'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import type { Tables } from '@/lib/supabase'
 import { useToast } from '@/components/ui/use-toast'
+import { listUserSubscriptions, updateSubscription } from '@/lib/supabase/queries/subscriptions'
 
 export default function AdminSubscriptions() {
   const { user } = useAuth()
@@ -17,24 +16,12 @@ export default function AdminSubscriptions() {
   const { data: subscriptions = [], isLoading } = useQuery({
     queryKey: ['subscriptions', user?.id],
     enabled: Boolean(user?.id),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('user_subscriptions')
-        .select('*')
-        .eq('user_id', user!.id)
-        .order('created_at', { ascending: false })
-      if (error) throw error
-      return data as Tables<'user_subscriptions'>[]
-    }
+    queryFn: () => listUserSubscriptions(user!.id)
   })
 
   const mutation = useMutation({
     mutationFn: async (subscriptionId: string) => {
-      const { error } = await supabase
-        .from('user_subscriptions')
-        .update({ status: selectedStatus })
-        .eq('id', subscriptionId)
-      if (error) throw error
+      await updateSubscription(subscriptionId, { status: selectedStatus })
     },
     onSuccess: () => {
       toast({ title: 'Subscription updated' })

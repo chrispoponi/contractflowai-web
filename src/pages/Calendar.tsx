@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { CalendarCheck2 } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/components/providers/AuthProvider'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Calendar as CalendarComponent } from '@/components/ui/calendar'
@@ -28,7 +28,7 @@ export default function CalendarPage() {
       const { data, error } = await supabase
         .from('contracts')
         .select('*')
-        .eq('owner_id', user!.id)
+        .eq('user_id', user!.id)
       if (error) throw error
       return data as Contract[]
     }

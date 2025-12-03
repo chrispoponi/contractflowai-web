@@ -47,7 +47,7 @@ export interface Database {
       contracts: {
         Row: {
           id: string
-          owner_id: string
+          user_id: string
           team_id: string | null
           organization_id: string | null
           title: string
@@ -77,7 +77,7 @@ export interface Database {
         }
         Insert: {
           id?: string
-          owner_id: string
+          user_id: string
           team_id?: string | null
           organization_id?: string | null
           title: string
@@ -106,7 +106,7 @@ export interface Database {
           updated_at?: string | null
         }
         Update: {
-          owner_id?: string
+          user_id?: string
           team_id?: string | null
           organization_id?: string | null
           title?: string
@@ -136,8 +136,8 @@ export interface Database {
         }
         Relationships: [
           {
-            foreignKeyName: 'contracts_owner_id_fkey'
-            columns: ['owner_id']
+            foreignKeyName: 'contracts_user_id_fkey'
+            columns: ['user_id']
             referencedRelation: 'users'
             referencedColumns: ['id']
           }

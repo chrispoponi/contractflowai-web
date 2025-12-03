@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/components/providers/AuthProvider'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -21,7 +21,7 @@ export default function TimelineGenerator() {
       const { data, error } = await supabase
         .from('contracts')
         .select('id, title')
-        .eq('owner_id', user!.id)
+        .eq('user_id', user!.id)
       if (error) throw error
       return data as Pick<Tables<'contracts'>, 'id' | 'title'>[]
     }
@@ -36,7 +36,7 @@ export default function TimelineGenerator() {
     try {
       await supabase.functions.invoke('generateClientTimeline', {
         body: {
-          ownerId: user?.id,
+          userId: user?.id,
           contractId
         }
       })

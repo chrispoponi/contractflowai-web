@@ -10,8 +10,8 @@ const supabase = createClient<Database>(
 
 serve(async (req) => {
   try {
-    const { contractId, storagePath, ownerId } = await req.json()
-    if (!contractId) return new Response(JSON.stringify({ error: 'contractId required' }), { status: 400 })
+    const { contractId, storagePath, userId } = await req.json()
+    if (!contractId || !userId) return new Response(JSON.stringify({ error: 'contractId and userId required' }), { status: 400 })
 
     const aiSummary = `AI summary for ${contractId} stored at ${storagePath ?? 'n/a'}`
     const summaryPayload = {
@@ -27,7 +27,7 @@ serve(async (req) => {
       .from('contracts')
       .update({ ai_summary: aiSummary, summary_path: summaryPath, updated_at: new Date().toISOString() })
       .eq('id', contractId)
-      .eq('owner_id', ownerId ?? '')
+      .eq('user_id', userId)
 
     if (error) throw error
 

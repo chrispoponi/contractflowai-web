@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/components/providers/AuthProvider'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -24,7 +24,7 @@ export default function ClientUpdates() {
       const { data, error } = await supabase
         .from('contracts')
         .select('id, title, client_name')
-        .eq('owner_id', user!.id)
+        .eq('user_id', user!.id)
       if (error) throw error
       return data as Pick<Tables<'contracts'>, 'id' | 'title' | 'client_name'>[]
     }
@@ -40,7 +40,7 @@ export default function ClientUpdates() {
     try {
       await supabase.functions.invoke('remindersEngine', {
         body: {
-          ownerId: user?.id,
+          userId: user?.id,
           contractId,
           cadence: 'client_update',
           message

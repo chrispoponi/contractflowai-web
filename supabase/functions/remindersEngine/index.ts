@@ -10,15 +10,15 @@ const supabase = createClient<Database>(
 
 serve(async (req) => {
   try {
-    const { ownerId, cadence = 'daily', contractId, message } = await req.json()
-    if (!ownerId) return new Response(JSON.stringify({ error: 'ownerId required' }), { status: 400 })
+    const { userId, cadence = 'daily', contractId, message } = await req.json()
+    if (!userId) return new Response(JSON.stringify({ error: 'userId required' }), { status: 400 })
 
-    const { data: user } = await supabase.from('users').select('*').eq('id', ownerId).single()
+    const { data: user } = await supabase.from('users').select('*').eq('id', userId).single()
 
     const { data: contracts } = await supabase
       .from('contracts')
       .select('id, title, client_name, closing_date')
-      .eq('owner_id', ownerId)
+      .eq('user_id', userId)
       .order('closing_date', { ascending: true })
 
     const payload = {
@@ -32,7 +32,7 @@ serve(async (req) => {
     await supabase
       .from('contracts')
       .update({ updated_at: new Date().toISOString() })
-      .eq('owner_id', ownerId)
+      .eq('user_id', userId)
       .limit(1)
 
     return new Response(JSON.stringify({ success: true, payload }), { headers: { 'Content-Type': 'application/json' } })

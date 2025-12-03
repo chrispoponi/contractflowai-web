@@ -10,15 +10,16 @@ const supabase = createClient<Database>(
 
 serve(async (req) => {
   try {
-    const { contractId, storagePath, fileName } = await req.json()
-    if (!contractId || !storagePath) {
-      return new Response(JSON.stringify({ error: 'contractId and storagePath required' }), { status: 400 })
+    const { contractId, storagePath, fileName, userId } = await req.json()
+    if (!contractId || !storagePath || !userId) {
+      return new Response(JSON.stringify({ error: 'contractId, storagePath, and userId required' }), { status: 400 })
     }
 
     const { data: parent, error: parentError } = await supabase
       .from('contracts')
       .select('*')
       .eq('id', contractId)
+      .eq('user_id', userId)
       .single()
 
     if (parentError || !parent) {
@@ -26,7 +27,7 @@ serve(async (req) => {
     }
 
     const insertPayload = {
-      owner_id: parent.owner_id,
+      user_id: parent.user_id,
       title: `${parent.title} – Counter Offer`,
       status: 'pending' as const,
       counter_offer_path: storagePath,

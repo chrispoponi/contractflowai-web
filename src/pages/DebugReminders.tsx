@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/components/providers/AuthProvider'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -13,7 +13,7 @@ export default function DebugReminders() {
     mutationFn: async (payload: { cadence: 'daily' | 'weekly' | 'sms' }) => {
       await supabase.functions.invoke('remindersEngine', {
         body: {
-          ownerId: user?.id,
+          userId: user?.id,
           cadence: payload.cadence
         }
       })

@@ -10,8 +10,8 @@ const supabase = createClient<Database>(
 
 serve(async (req) => {
   try {
-    const { ownerId } = await req.json()
-    if (!ownerId) return new Response(JSON.stringify({ error: 'ownerId required' }), { status: 400 })
+    const { userId } = await req.json()
+    if (!userId) return new Response(JSON.stringify({ error: 'userId required' }), { status: 400 })
 
     const nextRenewal = new Date()
     nextRenewal.setMonth(nextRenewal.getMonth() + 1)
@@ -19,7 +19,7 @@ serve(async (req) => {
     const { error } = await supabase
       .from('user_subscriptions')
       .update({ renews_at: nextRenewal.toISOString(), status: 'active' })
-      .eq('user_id', ownerId)
+      .eq('user_id', userId)
 
     if (error) throw error
 

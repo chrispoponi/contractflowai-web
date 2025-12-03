@@ -8,16 +8,16 @@ const supabase = createClient<Database>(supabaseUrl, supabaseKey, { auth: { pers
 
 serve(async (req) => {
   try {
-    const { contractId, ownerId } = await req.json()
-    if (!contractId || !ownerId) {
-      return new Response(JSON.stringify({ error: 'contractId and ownerId required' }), { status: 400 })
+    const { contractId, userId } = await req.json()
+    if (!contractId || !userId) {
+      return new Response(JSON.stringify({ error: 'contractId and userId required' }), { status: 400 })
     }
 
     const { data: contract, error } = await supabase
       .from('contracts')
       .select('*')
       .eq('id', contractId)
-      .eq('owner_id', ownerId)
+      .eq('user_id', userId)
       .single()
 
     if (error || !contract) {
