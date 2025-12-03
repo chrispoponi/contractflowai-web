@@ -48,3 +48,14 @@ export const ContractsAPI = {
     return data as ContractRow[]
   }
 }
+
+export const listContracts = (userId: string) => ContractsAPI.listByUser(userId)
+export const getContract = (id: string, userId: string) => ContractsAPI.getById(id, userId)
+export const fetchContract = (id: string, userId: string) => ContractsAPI.getById(id, userId)
+export const insertContract = (payload: ContractPayload) => ContractsAPI.insert(payload)
+export const updateContract = (id: string, userId: string, payload: ContractUpdate) => ContractsAPI.update(id, userId, payload)
+export const deleteContract = (id: string, userId: string) => ContractsAPI.remove(id, userId)
+export const listContractCounterOffers = (contractId: string, userId: string) =>
+  ContractsAPI.listCounterOffers(contractId, userId)
+export const listCounterOffers = (contractId: string, userId: string) =>
+  ContractsAPI.listCounterOffers(contractId, userId)
