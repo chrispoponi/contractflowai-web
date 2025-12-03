@@ -457,3 +457,19 @@ function CalendarGrid({
             </div>
             <div className="mt-2 space-y-1">
               {events.slice(0, 3).map((event) => (
+                <div
+                  key={`${event.contractId}-${event.type}-${event.date}`}
+                  className="flex items-center gap-2 rounded-lg bg-slate-50 px-2 py-1"
+                >
+                  <span className={`h-2 w-2 rounded-full ${colorMap[event.type]}`} />
+                  <span className="flex-1 truncate text-xs text-slate-600">{event.type}</span>
+                </div>
+              ))}
+              {events.length > 3 && <p className="text-xs text-slate-400">+{events.length - 3} more</p>}
+            </div>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
