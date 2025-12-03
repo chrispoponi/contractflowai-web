@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth } from "date-fns";
@@ -18,6 +17,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { getCurrentProfile, redirectToLogin } from "@/lib/supabaseAuth";
+import { supabaseEntities } from "@/lib/supabaseEntities";
+import { invokeFunction } from "@/lib/supabaseFunctions";
 
 export default function CalendarPage() {
   const [contracts, setContracts] = useState([]);
@@ -41,9 +43,9 @@ export default function CalendarPage() {
         setUser(JSON.parse(cachedUser));
       }
       
-      const userData = await base44.auth.me();
+      const userData = await getCurrentProfile();
       if (!userData) {
-        base44.auth.redirectToLogin(window.location.pathname);
+        redirectToLogin(window.location.pathname);
         return;
       }
       
@@ -54,7 +56,7 @@ export default function CalendarPage() {
       loadContracts();
     } catch (error) {
       console.error("Auth error:", error);
-      base44.auth.redirectToLogin(window.location.pathname);
+      redirectToLogin(window.location.pathname);
     }
   };
 
@@ -64,7 +66,7 @@ export default function CalendarPage() {
     sessionStorage.removeItem('contracts_cache_time');
     
     // Fetch fresh data
-    const contractData = await base44.entities.Contract.list();
+    const contractData = await supabaseEntities.Contract.list();
     console.log("📋 Loaded contracts:", contractData); // Debug log
     setContracts(contractData);
     
@@ -252,7 +254,7 @@ export default function CalendarPage() {
         
         console.log("✅ Sending to:", clientEmail);
         
-        const response = await base44.functions.invoke('generateClientTimeline', {
+        const response = await invokeFunction('generateClientTimeline', {
           contractId,
           sendToClient: true
         });

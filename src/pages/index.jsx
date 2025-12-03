@@ -32,6 +32,8 @@ import ClientUpdates from "./ClientUpdates";
 
 import Referrals from "./Referrals";
 
+import Login from "./Login";
+
 import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
 
 const PAGES = {
@@ -67,6 +69,8 @@ const PAGES = {
     ClientUpdates: ClientUpdates,
     
     Referrals: Referrals,
+    
+    Login: Login,
     
 }
 
@@ -126,6 +130,8 @@ function PagesContent() {
                 <Route path="/ClientUpdates" element={<ClientUpdates />} />
                 
                 <Route path="/Referrals" element={<Referrals />} />
+
+                <Route path="/Login" element={<Login />} />
                 
             </Routes>
         </Layout>

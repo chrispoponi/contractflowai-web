@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +27,9 @@ import EditContractModal from "../components/contracts/EditContractModal";
 import UploadCounterOfferModal from "../components/contracts/UploadCounterOfferModal";
 import TransactionChecklist from "../components/contracts/TransactionChecklist";
 import AddToCalendarButton from "../components/ui/AddToCalendarButton";
+import { getCurrentProfile, redirectToLogin } from "@/lib/supabaseAuth";
+import { supabaseEntities } from "@/lib/supabaseEntities";
+import { invokeFunction } from "@/lib/supabaseFunctions";
 
 function CancelContractModal({ onCancel, onClose }) {
   const [reason, setReason] = useState("");
@@ -112,9 +114,9 @@ export default function ContractDetailsPage() {
         // Assume cached user is valid, proceed
         loadContract();
       } else {
-        const userData = await base44.auth.me();
+        const userData = await getCurrentProfile();
         if (!userData) {
-          base44.auth.redirectToLogin(window.location.pathname);
+          redirectToLogin(window.location.pathname);
           return;
         }
         sessionStorage.setItem('user_data', JSON.stringify(userData)); // Cache user data
@@ -123,7 +125,7 @@ export default function ContractDetailsPage() {
     } catch (error) {
       console.error("Auth error:", error);
       sessionStorage.removeItem('user_data'); // Clear potentially stale cache
-      base44.auth.redirectToLogin(window.location.pathname);
+      redirectToLogin(window.location.pathname);
     }
   };
 
@@ -161,7 +163,7 @@ export default function ContractDetailsPage() {
     
     // Fetch fresh data in background (or if no cache was hit)
     try {
-      const freshContracts = await base44.entities.Contract.list();
+      const freshContracts = await supabaseEntities.Contract.list();
       sessionStorage.setItem('contracts_cache', JSON.stringify(freshContracts)); // Update cache
       
       const freshFoundContract = freshContracts.find(c => c.id === contractId);
@@ -199,25 +201,25 @@ export default function ContractDetailsPage() {
   };
 
   const handleSaveEdit = async (updatedData) => {
-    await base44.entities.Contract.update(contract.id, updatedData);
+    await supabaseEntities.Contract.update(contract.id, updatedData);
     
     // Invalidate cache after update
     sessionStorage.removeItem('contracts_cache');
 
     if (updatedData.all_parties_signed && contract.is_counter_offer && contract.original_contract_id) {
-      await base44.entities.Contract.update(contract.original_contract_id, { status: "superseded" });
+      await supabaseEntities.Contract.update(contract.original_contract_id, { status: "superseded" });
       
       // Invalidate cache after update
       sessionStorage.removeItem('contracts_cache');
 
-      const allContracts = await base44.entities.Contract.list(); // Re-fetch to get latest states
+      const allContracts = await supabaseEntities.Contract.list(); // Re-fetch to get latest states
       const otherCounters = allContracts.filter(c => 
         c.original_contract_id === contract.original_contract_id && 
         c.id !== contract.id
       );
       
       for (const other of otherCounters) {
-        await base44.entities.Contract.update(other.id, { status: "superseded" });
+        await supabaseEntities.Contract.update(other.id, { status: "superseded" });
       }
     }
     
@@ -226,7 +228,7 @@ export default function ContractDetailsPage() {
   };
 
   const handleCancelContract = async (reason, notes) => {
-    await base44.entities.Contract.update(contract.id, {
+    await supabaseEntities.Contract.update(contract.id, {
       status: "cancelled",
       cancellation_reason: reason,
       cancellation_notes: notes,
@@ -246,7 +248,7 @@ export default function ContractDetailsPage() {
       console.log("📧 Send to client:", sendToClient);
       console.log("👤 Client email:", contract.representing_side === 'buyer' ? contract.buyer_email : contract.seller_email);
       
-      const response = await base44.functions.invoke('generateClientTimeline', {
+      const response = await invokeFunction('generateClientTimeline', {
         contractId: contract.id,
         sendToClient: sendToClient
       });
@@ -759,7 +761,7 @@ export default function ContractDetailsPage() {
                               if (field === "closing_completed") {
                                 updates.status = "closed";
                               }
-                              await base44.entities.Contract.update(contract.id, updates);
+                              await supabaseEntities.Contract.update(contract.id, updates);
                               sessionStorage.removeItem('contracts_cache'); // Invalidate cache
                               loadContract();
                             }}

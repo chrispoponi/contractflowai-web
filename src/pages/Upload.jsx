@@ -1,6 +1,5 @@
 
 import React, { useState, useRef, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Upload, FileText, ArrowLeft, Loader2 } from "lucide-react";
@@ -10,6 +9,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { differenceInDays } from "date-fns";
 
 import ContractForm from "../components/upload/ContractForm";
+import { getCurrentProfile, redirectToLogin, updateCurrentProfile } from "@/lib/supabaseAuth";
+import { supabaseEntities } from "@/lib/supabaseEntities";
+import { uploadContractFile } from "@/lib/storage";
+import { invokeFunction } from "@/lib/supabaseFunctions";
 
 export default function UploadPage() {
   const navigate = useNavigate();
@@ -86,58 +89,52 @@ export default function UploadPage() {
         calculateLimitsFromUser(userData);
       }
       
-      const verifiedUserData = await base44.auth.me();
+      const verifiedUserData = await getCurrentProfile();
       if (!verifiedUserData) {
-        base44.auth.redirectToLogin(window.location.pathname);
+        redirectToLogin(window.location.pathname);
         return;
       }
       loadData();
     } catch (error) {
       console.error("Auth error:", error);
-      base44.auth.redirectToLogin(window.location.pathname);
+      redirectToLogin(window.location.pathname);
       sessionStorage.removeItem('user_data');
     }
   };
 
   const loadData = async () => {
     try {
-      let userData = await base44.auth.me();
-      
-      sessionStorage.setItem('user_data', JSON.stringify(userData));
+      let userData = await getCurrentProfile();
+      if (!userData) {
+        throw new Error("Unable to load profile");
+      }
 
       if (!userData.trial_start_date && userData.subscription_tier === 'trial') {
         const today = new Date();
         const trialStartDate = today.toISOString().split('T')[0];
         
         const endDate = new Date(today);
-        endDate.setDate(endDate.setDate(today.getDate() + 60)); // 60 days trial
+        endDate.setDate(endDate.getDate() + 60); // 60 days trial
         const trialEndDate = endDate.toISOString().split('T')[0];
         
-        await base44.auth.updateMe({
+        userData = await updateCurrentProfile({
           trial_start_date: trialStartDate,
           trial_end_date: trialEndDate,
           contracts_used_this_month: 0,
           monthly_reset_date: today.toISOString().split('T')[0]
         });
-        
-        userData = await base44.auth.me(); 
-        sessionStorage.setItem('user_data', JSON.stringify(userData));
       }
       
       const today = new Date();
       const lastResetDate = userData.monthly_reset_date ? new Date(userData.monthly_reset_date) : null;
       
       if (lastResetDate && (lastResetDate.getMonth() !== today.getMonth() || lastResetDate.getFullYear() !== today.getFullYear())) {
-        await base44.auth.updateMe({
+        userData = await updateCurrentProfile({
           contracts_used_this_month: 0,
           monthly_reset_date: today.toISOString().split('T')[0]
         });
-        userData = await base44.auth.me();
-        sessionStorage.setItem('user_data', JSON.stringify(userData));
       }
 
-      setUser(userData);
-      
       const limits = {
         trial: 1,
         beta: Infinity, // Add beta tier here
@@ -155,7 +152,7 @@ export default function UploadPage() {
       if (userData.subscription_tier === 'beta' || userData.subscription_tier === 'team_beta') { // Beta users never see upgrade prompt
         shouldShowUpgrade = false; 
       } else if (userData.subscription_tier === 'trial') {
-        const contracts = await base44.entities.Contract.list();
+        const contracts = await supabaseEntities.Contract.list();
         const daysElapsed = userData.trial_start_date ? differenceInDays(today, new Date(userData.trial_start_date)) : 0;
         
         const trialEndDate = userData.trial_end_date ? new Date(userData.trial_end_date) : null;
@@ -174,12 +171,13 @@ export default function UploadPage() {
           shouldShowUpgrade = true;
         }
       }
-      
       if (userData.subscription_tier !== 'trial' && userData.subscription_tier !== 'beta' && userData.subscription_tier !== 'team_beta' && userData.subscription_status !== 'active') {
         shouldShowUpgrade = true;
       }
 
       setShowUpgradePrompt(shouldShowUpgrade);
+      sessionStorage.setItem('user_data', JSON.stringify(userData));
+      setUser(userData);
       
     } catch (error) {
       console.error("Error loading data:", error);
@@ -258,15 +256,20 @@ export default function UploadPage() {
     setError(null);
 
     try {
-      console.log("Uploading file securely...");
-      const { data: uploadResult } = await base44.functions.invoke('secureUpload', { file: selectedFile });
-      
-      if (!uploadResult.success) {
-        throw new Error(uploadResult.error || "Upload failed");
+      console.log("Uploading file to Supabase Storage...");
+      const activeUser = user || (await getCurrentProfile());
+      if (!activeUser) {
+        redirectToLogin(window.location.pathname);
+        return;
       }
+
+      const uploadResult = await uploadContractFile({
+        file: selectedFile,
+        userId: activeUser.id,
+      });
       
-      const file_url = uploadResult.file_url;
-      console.log("File uploaded securely:", file_url);
+      const file_url = uploadResult.signedUrl;
+      console.log("File uploaded to storage:", uploadResult.path);
 
       // Define Contract schema inline with detailed descriptions
       const contractSchema = {
@@ -296,7 +299,7 @@ export default function UploadPage() {
       console.log("Extracting contract data with AI...");
       
       // First pass: Extract all data including contact info
-      const extractResult = await base44.integrations.Core.ExtractDataFromUploadedFile({
+      const extractResult = await invokeFunction('extract-contract-data', {
         file_url,
         json_schema: contractSchema
       });
@@ -306,7 +309,7 @@ export default function UploadPage() {
         console.log("Verifying dates and contact information...");
         
         // Enhanced verification with focus on contact info
-        const verification = await base44.integrations.Core.InvokeLLM({
+        const verification = await invokeFunction('verify-contract-data', {
           prompt: `You are a real estate contract data extractor. Your job is to verify ALL information with 100% accuracy.
 
 CRITICAL RULES:
@@ -373,13 +376,19 @@ Return in this format:
         });
 
         console.log("Generating summary...");
-        const summary = await base44.integrations.Core.InvokeLLM({
-          prompt: `You are reviewing a real estate contract. Summarize the key terms in 2-3 simple, clear sentences that a homebuyer would understand. Focus on: purchase price, important dates, and any special conditions. Here's the contract data: ${JSON.stringify(verifiedData)}`,
+        const summaryResponse = await invokeFunction('summarize-contract', {
+          prompt: `You are reviewing a real estate contract. Summarize the key terms in 2-3 simple, clear sentences that a homebuyer would understand. Focus on: purchase price, important dates, and any special conditions.`,
+          contract: verifiedData
         });
+        const summary =
+          typeof summaryResponse === "string"
+            ? summaryResponse
+            : summaryResponse?.summary || "";
 
         setExtractedData({
           ...verifiedData,
-          contract_file_url: file_url,
+          contract_file_url: uploadResult.publicUrl || file_url,
+          storage_path: uploadResult.path,
           plain_language_summary: summary,
           agent_notes: "",
           _uncertain_fields: uncertainFields // Track uncertain fields for user review
@@ -406,7 +415,7 @@ Return in this format:
   const handleSave = async (contractData) => {
     setIsProcessing(true);
     try {
-      await base44.entities.Contract.create(contractData);
+      await supabaseEntities.Contract.create(contractData);
       
       // Exclude 'team', 'beta', and 'team_beta' from contract count increment
       if (user && user.subscription_tier !== 'team' && user.subscription_tier !== 'beta' && user.subscription_tier !== 'team_beta') { 
@@ -415,7 +424,7 @@ Return in this format:
         setUser(updatedUser);
         sessionStorage.setItem('user_data', JSON.stringify(updatedUser));
 
-        await base44.auth.updateMe({
+        await updateCurrentProfile({
           contracts_used_this_month: updatedContractsUsed
         });
       }

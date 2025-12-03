@@ -4,7 +4,7 @@ import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { LayoutDashboard, Upload, Calendar, FileText, LogOut, Archive, Send } from "lucide-react";
-import { base44 } from "@/api/base44Client";
+import { getCurrentProfile, isAuthenticated, redirectToLogin, logout as supabaseLogout } from "@/lib/supabaseAuth";
 import {
   Sidebar,
   SidebarContent,
@@ -92,7 +92,7 @@ export default function Layout({ children, currentPageName }) {
   const [authError, setAuthError] = React.useState(null);
 
   // Public pages that don't need auth or sidebar
-  const publicPages = ['Landing', 'Pricing', 'Privacy', 'Home'];
+  const publicPages = ['Landing', 'Pricing', 'Privacy', 'Home', 'Login'];
   const isPublicPage = publicPages.includes(currentPageName);
 
   // Cache user data in sessionStorage for faster subsequent loads
@@ -104,89 +104,48 @@ export default function Layout({ children, currentPageName }) {
 
   const loadUser = async () => {
     try {
-      // Check cache first
       const cachedUser = sessionStorage.getItem('user_data');
       if (cachedUser) {
         setUser(JSON.parse(cachedUser));
       }
-      
-      // Check if authenticated first
-      const isAuth = await base44.auth.isAuthenticated();
-      console.log("🔐 Is authenticated:", isAuth);
-      
-      if (!isAuth) {
-        console.log("❌ Not authenticated, redirecting to login");
+
+      const authStatus = await isAuthenticated();
+      if (!authStatus) {
         sessionStorage.removeItem('user_data');
-        base44.auth.redirectToLogin(window.location.pathname);
+        redirectToLogin(window.location.pathname);
         return;
       }
-      
-      // Then fetch fresh data
-      const userData = await base44.auth.me();
-      console.log("✅ User data loaded:", userData.email);
+
+      const userData = await getCurrentProfile();
+      if (!userData) {
+        sessionStorage.removeItem('user_data');
+        redirectToLogin(window.location.pathname);
+        return;
+      }
+
       setUser(userData);
       sessionStorage.setItem('user_data', JSON.stringify(userData));
       setAuthError(null);
     } catch (error) {
       console.error("❌ Error loading user:", error);
-      console.error("Error details:", error.message, error.response?.status);
-      
-      if (error.response?.status === 403) {
-        setAuthError("Access denied. Please contact support if you should have access to this app.");
-      } else {
-        setAuthError("Authentication error. Please try logging in again.");
-      }
-      
-      sessionStorage.removeItem('user_data'); // Clear cache if loading fails
-      
-      // Redirect to login after a short delay to show error
+      setAuthError("Authentication error. Please try logging in again.");
+      sessionStorage.removeItem('user_data');
       setTimeout(() => {
-        base44.auth.redirectToLogin(window.location.pathname);
+        redirectToLogin(window.location.pathname);
       }, 2000);
     }
   };
 
   const handleLogout = async () => {
-    sessionStorage.removeItem('user_data'); // Clear cache on logout
-    sessionStorage.removeItem('contracts_cache'); // Clear contracts cache
-    sessionStorage.removeItem('contracts_cache_time'); // Clear contracts cache time
-    await base44.auth.logout();
+    sessionStorage.removeItem('user_data');
+    sessionStorage.removeItem('contracts_cache');
+    sessionStorage.removeItem('contracts_cache_time');
+    await supabaseLogout(createPageUrl("Landing"));
   };
 
   // If it's a public page, just render children without sidebar or auth
   if (isPublicPage) {
-    return (
-      <>
-        <style>
-          {`
-            /* GLOBAL: Hide Base44 developer widget from ALL pages */
-            [class*="base44" i],
-            [id*="base44" i],
-            [class*="editor" i],
-            [class*="widget" i],
-            div[style*="position: fixed"][style*="bottom"],
-            div[style*="position: fixed"][style*="right"],
-            button[title*="base44" i],
-            button[title*="edit" i],
-            iframe[src*="base44" i],
-            a[href*="base44.app" i],
-            a[href*="base44.com" i] {
-              display: none !important;
-              visibility: hidden !important;
-              opacity: 0 !important;
-              pointer-events: none !important;
-              width: 0 !important;
-              height: 0 !important;
-              position: absolute !important;
-              left: -99999px !important;
-              top: -99999px !important;
-              z-index: -1 !important;
-            }
-          `}
-        </style>
-        {children}
-      </>
-    );
+    return <>{children}</>;
   }
 
   // Show auth error if exists
@@ -217,30 +176,6 @@ export default function Layout({ children, currentPageName }) {
             --text-dark: #1f2937;
             --text-light: #6b7280;
             --bg-light: #f9fafb;
-          }
-
-          /* GLOBAL: Hide Base44 widgets */
-          [class*="base44" i],
-          [id*="base44" i],
-          [class*="editor" i],
-          [class*="widget" i],
-          div[style*="position: fixed"][style*="bottom"],
-          div[style*="position: fixed"][style*="right"],
-          button[title*="base44" i],
-          button[title*="edit" i],
-          iframe[src*="base44" i],
-          a[href*="base44.app" i],
-          a[href*="base44.com" i] {
-            display: none !important;
-            visibility: hidden !important;
-            opacity: 0 !important;
-            pointer-events: none !important;
-            width: 0 !important;
-            height: 0 !important;
-            position: absolute !important;
-            left: -99999px !important;
-            top: -99999px !important;
-            z-index: -1 !important;
           }
         `}
       </style>

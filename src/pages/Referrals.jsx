@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Gift, Copy, Check, Users, Mail, Link as LinkIcon } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { getCurrentProfile } from "@/lib/supabaseAuth";
+import { supabaseEntities } from "@/lib/supabaseEntities";
 
 export default function ReferralsPage() {
   const [user, setUser] = useState(null);
@@ -23,11 +24,11 @@ export default function ReferralsPage() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const userData = await base44.auth.me();
+      const userData = await getCurrentProfile();
       setUser(userData);
 
       // Get user's referral code and referrals
-      const myReferrals = await base44.entities.Referral.filter({
+      const myReferrals = await supabaseEntities.Referral.filter({
         referrer_email: userData.email
       });
 
@@ -50,7 +51,7 @@ export default function ReferralsPage() {
       const code = `CF-${randomPart}`;
       
       // Create referral entry
-      await base44.entities.Referral.create({
+      await supabaseEntities.Referral.create({
         referrer_email: user.email,
         ref_code: code,
         status: 'pending'

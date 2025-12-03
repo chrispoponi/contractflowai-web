@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect, useCallback } from "react";
-import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { Button } from "@/components/ui/button";
@@ -11,6 +10,9 @@ import { CreditCard } from "lucide-react";
 import StatsOverview from "../components/dashboard/StatsOverview";
 import ContractsList from "../components/dashboard/ContractsList";
 import UpcomingDates from "../components/dashboard/UpcomingDates";
+import { getCurrentProfile, redirectToLogin, updateCurrentProfile } from "@/lib/supabaseAuth";
+import { supabaseEntities } from "@/lib/supabaseEntities";
+import { invokeFunction } from "@/lib/supabaseFunctions";
 
 export default function Dashboard() {
   const [contracts, setContracts] = useState([]);
@@ -32,9 +34,9 @@ export default function Dashboard() {
         setUser(JSON.parse(cachedUser));
       }
       
-      const userData = await base44.auth.me();
+      const userData = await getCurrentProfile();
       if (!userData) {
-        base44.auth.redirectToLogin(window.location.pathname);
+        redirectToLogin(window.location.pathname);
         sessionStorage.removeItem('user_data');
         return;
       }
@@ -46,9 +48,7 @@ export default function Dashboard() {
       const pendingRefCode = sessionStorage.getItem('pending_ref_code');
       if (pendingRefCode) {
         try {
-          await base44.functions.invoke('processReferral', {
-            code: pendingRefCode
-          });
+          await invokeFunction('processReferral', { code: pendingRefCode });
           console.log("✅ Referral processed");
           sessionStorage.removeItem('pending_ref_code');
         } catch (refError) {
@@ -60,7 +60,7 @@ export default function Dashboard() {
     } catch (error) {
       console.error("Auth error:", error);
       sessionStorage.removeItem('user_data');
-      base44.auth.redirectToLogin(window.location.pathname);
+      redirectToLogin(window.location.pathname);
     }
   };
 
@@ -133,10 +133,10 @@ export default function Dashboard() {
       let userData = currentUserData;
       if (!userData) {
           console.warn("loadData called without user data, fetching it again.");
-          userData = await base44.auth.me();
+          userData = await getCurrentProfile();
           if (!userData) {
               console.error("No user data available for loadData, redirecting.");
-              base44.auth.redirectToLogin(window.location.pathname);
+              redirectToLogin(window.location.pathname);
               setIsLoading(false);
               return;
           }
@@ -147,12 +147,11 @@ export default function Dashboard() {
       if (betaTesters.includes(userData.email)) {
         if (userData.subscription_status !== 'active' || userData.subscription_tier !== 'professional' || userData.organization_role !== 'admin') {
           console.log(`Auto-upgrading ${userData.email} to professional active subscription.`);
-          await base44.auth.updateMe({
+          userData = await updateCurrentProfile({
             subscription_tier: 'professional',
             subscription_status: 'active',
             organization_role: userData.email === 'chrispoponi@gmail.com' ? 'admin' : 'team_lead'
           });
-          userData = await base44.auth.me();
         }
       }
       
@@ -165,26 +164,36 @@ export default function Dashboard() {
         endDate.setDate(endDate.getDate() + 60);
         const trialEndDate = endDate.toISOString().split('T')[0];
         
-        await base44.auth.updateMe({
+        userData = await updateCurrentProfile({
           trial_start_date: trialStartDate,
           trial_end_date: trialEndDate,
           contracts_used_this_month: 0,
           monthly_reset_date: today.toISOString().split('T')[0]
         });
-        
-        userData = { 
-          ...userData, 
-          trial_start_date: trialStartDate,
-          trial_end_date: trialEndDate,
-          contracts_used_this_month: 0,
-          monthly_reset_date: today.toISOString().split('T')[0]
-        };
       }
+
+      const today = new Date();
+      const lastResetDate = userData.monthly_reset_date
+        ? new Date(userData.monthly_reset_date)
+        : null;
+
+      if (
+        lastResetDate &&
+        (lastResetDate.getMonth() !== today.getMonth() ||
+          lastResetDate.getFullYear() !== today.getFullYear())
+      ) {
+        userData = await updateCurrentProfile({
+          contracts_used_this_month: 0,
+          monthly_reset_date: today.toISOString().split("T")[0],
+        });
+      }
+
+      sessionStorage.setItem("user_data", JSON.stringify(userData));
       
       // Fetch contracts
       let allContracts = [];
       try {
-        allContracts = await base44.entities.Contract.list("-created_date");
+        allContracts = await supabaseEntities.Contract.list("-created_date");
         console.log("✅ Contracts loaded:", allContracts.length);
       } catch (contractError) {
         console.error("❌ Error loading contracts:", contractError);
@@ -243,7 +252,7 @@ export default function Dashboard() {
       
     } catch (error) {
       console.error("Error loading data:", error);
-      base44.auth.redirectToLogin(window.location.pathname);
+      redirectToLogin(window.location.pathname);
     }
     setIsLoading(false);
   };

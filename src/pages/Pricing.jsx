@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Check, Sparkles, Users, Building2, Zap } from "lucide-react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
+import { getCurrentProfile, redirectToLogin } from "@/lib/supabaseAuth";
 
 const plans = [
   {
@@ -99,7 +99,7 @@ export default function PricingPage() {
 
   const loadUser = async () => {
     try {
-      const userData = await base44.auth.me();
+      const userData = await getCurrentProfile();
       setUser(userData);
     } catch (error) {
       setUser(null);
@@ -122,20 +122,17 @@ export default function PricingPage() {
   };
 
   const handleTrialStart = () => {
-    base44.auth.redirectToLogin(createPageUrl("Dashboard"));
+    redirectToLogin(createPageUrl("Dashboard"));
   };
 
   const handleSignIn = () => {
-    base44.auth.redirectToLogin(createPageUrl("Dashboard"));
+    redirectToLogin(createPageUrl("Dashboard"));
   };
 
   return (
     <div className="min-h-screen bg-white">
       <style>
         {`
-          [class*="base44"], [id*="base44"], button[title*="base44"], a[href*="base44"] {
-            display: none !important;
-          }
           stripe-buy-button {
             display: flex !important;
             justify-content: center !important;

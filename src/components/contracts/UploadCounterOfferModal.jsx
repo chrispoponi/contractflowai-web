@@ -1,6 +1,5 @@
 
 import React, { useState, useRef } from "react";
-import { base44 } from "@/api/base44Client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,6 +7,10 @@ import { Upload, FileText, Loader2, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 import ContractForm from "../upload/ContractForm";
+import { uploadContractFile } from "@/lib/storage";
+import { invokeFunction } from "@/lib/supabaseFunctions";
+import { supabaseEntities } from "@/lib/supabaseEntities";
+import { getCurrentProfile } from "@/lib/supabaseAuth";
 
 export default function UploadCounterOfferModal({ originalContractId, existingCounterOffers, onClose, onSuccess }) {
   const [file, setFile] = useState(null);
@@ -55,13 +58,23 @@ export default function UploadCounterOfferModal({ originalContractId, existingCo
     setError(null);
 
     try {
-      const { data: uploadResult } = await base44.functions.invoke('secureUpload', { file: selectedFile });
-      
-      if (!uploadResult.success) {
-        throw new Error(uploadResult.error || "Upload failed");
+      const cachedUser = sessionStorage.getItem("user_data");
+      let userId = cachedUser ? JSON.parse(cachedUser).id : null;
+      if (!userId) {
+        const profile = await getCurrentProfile();
+        userId = profile?.id;
       }
+
+      if (!userId) {
+        throw new Error("You must be signed in to upload a counter offer.");
+      }
+
+      const uploadResult = await uploadContractFile({
+        file: selectedFile,
+        userId,
+      });
       
-      const file_url = uploadResult.file_url;
+      const file_url = uploadResult.signedUrl;
 
       // Define Contract schema inline
       const contractSchema = {
@@ -90,19 +103,25 @@ export default function UploadCounterOfferModal({ originalContractId, existingCo
         }
       };
 
-      const extractResult = await base44.integrations.Core.ExtractDataFromUploadedFile({
+      const extractResult = await invokeFunction('extract-contract-data', {
         file_url,
         json_schema: contractSchema
       });
 
       if (extractResult.status === "success" && extractResult.output) {
-        const summary = await base44.integrations.Core.InvokeLLM({
-          prompt: `You are reviewing a real estate counter offer. Summarize the key terms in 2-3 simple, clear sentences that a homebuyer would understand. Focus on: purchase price, important dates, and any special conditions. Here's the contract data: ${JSON.stringify(extractResult.output)}`,
+        const summaryResponse = await invokeFunction('summarize-contract', {
+          prompt: `You are reviewing a real estate counter offer. Summarize the key terms in 2-3 simple, clear sentences that a homebuyer would understand. Focus on: purchase price, important dates, and any special conditions.`,
+          contract: extractResult.output
         });
+        const summary =
+          typeof summaryResponse === "string"
+            ? summaryResponse
+            : summaryResponse?.summary || "";
 
         setExtractedData({
           ...extractResult.output,
-          contract_file_url: file_url,
+          contract_file_url: uploadResult.publicUrl || file_url,
+          storage_path: uploadResult.path,
           plain_language_summary: summary,
           is_counter_offer: true,
           original_contract_id: originalContractId,
@@ -123,7 +142,7 @@ export default function UploadCounterOfferModal({ originalContractId, existingCo
   const handleSave = async (contractData) => {
     setIsProcessing(true);
     try {
-      await base44.entities.Contract.create(contractData);
+      await supabaseEntities.Contract.create(contractData);
       onSuccess();
       onClose();
     } catch (err) {

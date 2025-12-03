@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, XCircle, AlertTriangle, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
+import { getCurrentProfile, redirectToLogin } from "@/lib/supabaseAuth";
+import { supabaseEntities } from "@/lib/supabaseEntities";
+import { invokeFunction } from "@/lib/supabaseFunctions";
 
 export default function DebugRemindersPage() {
   const navigate = useNavigate();
@@ -21,10 +23,14 @@ export default function DebugRemindersPage() {
 
   const loadData = async () => {
     try {
-      const userData = await base44.auth.me();
+      const userData = await getCurrentProfile();
+      if (!userData) {
+        redirectToLogin(window.location.pathname);
+        return;
+      }
       setUser(userData);
       
-      const allContracts = await base44.entities.Contract.list();
+      const allContracts = await supabaseEntities.Contract.list();
       setContracts(allContracts);
       
       // Check for issues
@@ -155,7 +161,7 @@ export default function DebugRemindersPage() {
   const testFunctionNow = async () => {
     setIsTesting(true);
     try {
-      const { data } = await base44.functions.invoke('sendDailyReminders');
+      const data = await invokeFunction('sendDailyReminders');
       setTestResult({
         success: data.success || data.emailsSent > 0,
         emailsSent: data.emailsSent || 0,

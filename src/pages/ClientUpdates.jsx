@@ -1,12 +1,14 @@
 
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Send, CheckCircle, Loader2, Calendar, Mail } from "lucide-react";
 import { format, parseISO, differenceInDays, addDays } from "date-fns";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { getCurrentProfile, redirectToLogin } from "@/lib/supabaseAuth";
+import { supabaseEntities } from "@/lib/supabaseEntities";
+import { invokeFunction } from "@/lib/supabaseFunctions";
 
 export default function ClientUpdatesPage() {
   const [contracts, setContracts] = useState([]);
@@ -22,24 +24,24 @@ export default function ClientUpdatesPage() {
 
   const checkAuthAndLoadData = async () => {
     try {
-      const userData = await base44.auth.me();
+      const userData = await getCurrentProfile();
       if (!userData) {
-        base44.auth.redirectToLogin(window.location.pathname);
+        redirectToLogin(window.location.pathname);
         return;
       }
       setUser(userData);
       loadData();
     } catch (error) {
       console.error("Auth error:", error);
-      base44.auth.redirectToLogin(window.location.pathname);
+      redirectToLogin(window.location.pathname);
     }
   };
 
   const loadData = async () => {
     try {
       const [contractData, updateData] = await Promise.all([
-        base44.entities.Contract.list(),
-        base44.entities.ClientUpdate.list("-sent_date")
+        supabaseEntities.Contract.list(),
+        supabaseEntities.ClientUpdate.list("-sent_date")
       ]);
       setContracts(contractData);
       setUpdates(updateData);
@@ -245,16 +247,16 @@ ${user.brokerage_name || ''}
 ---
 Sent from ContractFlowAI`;
 
-      // Send email
-      await base44.integrations.Core.SendEmail({
+      // Send email via Supabase Edge Function
+      await invokeFunction('sendClientEmail', {
         from_name: user.full_name,
         to: dateInfo.contract.buyer_email,
-        subject: subject,
+        subject,
         body: emailBody
       });
 
       // Save update record
-      await base44.entities.ClientUpdate.create({
+      await supabaseEntities.ClientUpdate.create({
         contract_id: dateInfo.contract_id,
         client_email: dateInfo.contract.buyer_email,
         client_phone: dateInfo.contract.buyer_phone || "",

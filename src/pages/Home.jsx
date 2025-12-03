@@ -2,36 +2,21 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle, Calendar, Bell, FileText, Users, ArrowRight } from "lucide-react";
-import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
+import { redirectToLogin } from "@/lib/supabaseAuth";
 
 export default function HomePage() {
   const handleSignIn = () => {
-    base44.auth.redirectToLogin(createPageUrl("Dashboard"));
+    redirectToLogin(createPageUrl("Dashboard"));
   };
 
   const handleTryFree = () => {
-    base44.auth.redirectToLogin(createPageUrl("Dashboard"));
+    redirectToLogin(createPageUrl("Dashboard"));
   };
 
   return (
     <div className="min-h-screen">
-      <style>
-        {`
-          /* Hide Base44 developer widget */
-          [class*="base44-widget"],
-          [class*="base44-editor"],
-          [id*="base44-widget"],
-          [id*="base44-editor"] {
-            display: none !important;
-            visibility: hidden !important;
-            opacity: 0 !important;
-            pointer-events: none !important;
-          }
-        `}
-      </style>
-
       {/* Navigation */}
       <nav className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
