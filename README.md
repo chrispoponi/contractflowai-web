@@ -20,6 +20,12 @@ VITE_STRIPE_PRO_BUTTON_ID=buy_btn_xxx      # optional, overrides fallback
 VITE_STRIPE_TEAM_BUTTON_ID=buy_btn_xxx     # optional, overrides fallback
 ```
 
+Stripe webhooks should target your Supabase Edge Function, e.g.:
+
+```
+https://uehjpftyvycbrketwhwg.supabase.co/functions/v1/stripe-webhook
+```
+
 ## Supabase Edge Functions
 
 Functions live in `supabase/functions/*` and cover timeline generation, file uploads, reminder automation, referrals, subscription renewals, counter-offer creation, and contract parsing.
