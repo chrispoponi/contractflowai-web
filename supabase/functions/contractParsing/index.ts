@@ -11,21 +11,30 @@ const supabase = createClient<Database>(
 serve(async (req) => {
   try {
     const { contractId, storagePath, userId } = await req.json()
-    if (!contractId || !userId) return new Response(JSON.stringify({ error: 'contractId and userId required' }), { status: 400 })
+    if (!contractId || !userId)
+      return new Response(JSON.stringify({ error: 'contractId and userId required' }), { status: 400 })
 
     const aiSummary = `AI summary for ${contractId} stored at ${storagePath ?? 'n/a'}`
     const summaryPayload = {
       summary: aiSummary,
       generated_at: new Date().toISOString()
     }
+
     const summaryPath = `${contractId}/summary.json`
-    await supabase.storage.from('summaries').upload(summaryPath, new Blob([JSON.stringify(summaryPayload)], { type: 'application/json' }), {
-      upsert: true
-    })
+
+    await supabase.storage
+      .from('summaries')
+      .upload(summaryPath, new Blob([JSON.stringify(summaryPayload)], { type: 'application/json' }), {
+        upsert: true
+      })
 
     const { error } = await supabase
       .from('contracts')
-      .update({ ai_summary: aiSummary, summary_path: summaryPath, updated_at: new Date().toISOString() })
+      .update({
+        ai_summary: aiSummary,
+        summary_path: summaryPath,
+        updated_at: new Date().toISOString()
+      })
       .eq('id', contractId)
       .eq('user_id', userId)
 
