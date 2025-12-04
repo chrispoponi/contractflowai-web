@@ -26,9 +26,25 @@ Stripe webhooks should target your Supabase Edge Function, e.g.:
 https://uehjpftyvycbrketwhwg.supabase.co/functions/v1/stripe-webhook
 ```
 
+Supabase Edge Function secrets (configured in Supabase project settings or `supabase/functions/.env` when testing locally):
+
+```
+SUPABASE_URL=https://uehjpftyvycbrketwhwg.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=...
+STRIPE_SECRET_KEY=sk_live_or_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+```
+
+When creating Stripe Buy Buttons / Checkout Sessions be sure to include metadata:
+
+- `supabase_user_id`: the UUID of the user purchasing
+- `plan`: one of `trial`, `budget`, `professional`, `team` (or whichever labels you map to Supabase)
+
+That metadata lets the webhook map payments back to Supabase rows automatically.
+
 ## Supabase Edge Functions
 
-Functions live in `supabase/functions/*` and cover timeline generation, file uploads, reminder automation, referrals, subscription renewals, counter-offer creation, and contract parsing.
+Functions live in `supabase/functions/*` and cover timeline generation, file uploads, reminder automation, referrals, subscription renewals, Stripe webhooks, counter-offer creation, and contract parsing.
 
 ## Deploying
 
