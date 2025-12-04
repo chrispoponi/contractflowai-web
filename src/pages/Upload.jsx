@@ -2,8 +2,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Upload, FileText, ArrowLeft, Loader2 } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Upload, FileText, ArrowLeft, Loader2, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -23,6 +23,8 @@ export default function UploadPage() {
   const [contractLimit, setContractLimit] = useState(null);
   const fileInputRef = useRef(null);
   const [currentQuoteIndex, setCurrentQuoteIndex] = useState(0);
+  const [needsAuth, setNeedsAuth] = useState(false);
+  const [authCheckComplete, setAuthCheckComplete] = useState(false);
 
   const reassuringQuotes = [
     "☕ Sit back and relax, I've got this",
@@ -86,16 +88,21 @@ export default function UploadPage() {
         calculateLimitsFromUser(userData);
       }
       
-      const verifiedUserData = await base44.auth.me();
-      if (!verifiedUserData) {
-        base44.auth.redirectToLogin(window.location.pathname);
+      const isAuth = await base44.auth.isAuthenticated();
+      if (!isAuth) {
+        setNeedsAuth(true);
+        sessionStorage.removeItem('user_data');
         return;
       }
-      loadData();
+      
+      setNeedsAuth(false);
+      await loadData();
     } catch (error) {
       console.error("Auth error:", error);
-      base44.auth.redirectToLogin(window.location.pathname);
+      setNeedsAuth(true);
       sessionStorage.removeItem('user_data');
+    } finally {
+      setAuthCheckComplete(true);
     }
   };
 
@@ -186,6 +193,14 @@ export default function UploadPage() {
       setError("Error loading user data. Please refresh the page.");
       sessionStorage.removeItem('user_data');
     }
+  };
+
+  const handleStartTrial = () => {
+    base44.auth.redirectToLogin(createPageUrl("Upload"));
+  };
+
+  const handleViewPricing = () => {
+    navigate(createPageUrl("Pricing"));
   };
 
   const handleDrag = (e) => {
@@ -427,6 +442,59 @@ Return in this format:
     }
     setIsProcessing(false);
   };
+
+  if (!authCheckComplete) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1e3a5f]" />
+      </div>
+    );
+  }
+
+  if (needsAuth) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8 flex items-center justify-center">
+        <Card className="max-w-2xl w-full shadow-2xl">
+          <CardHeader className="text-center space-y-4">
+            <div className="w-20 h-20 mx-auto mb-2 bg-gradient-to-br from-[#1e3a5f] to-[#2563eb] rounded-full flex items-center justify-center">
+              <Sparkles className="w-10 h-10 text-white" />
+            </div>
+            <CardTitle className="text-3xl font-bold text-gray-900">
+              Upload Contracts in Seconds
+            </CardTitle>
+            <p className="text-gray-600 text-lg">
+              Start a free 60-day trial (no card required) to upload your first contract. Already a member? Sign in to continue.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-5 text-left space-y-2">
+              <p className="text-gray-800 font-semibold">What you get:</p>
+              <ul className="text-gray-600 list-disc list-inside space-y-1 text-sm">
+                <li>AI contract analysis with automatic deadlines</li>
+                <li>Smart reminders and calendar syncing</li>
+                <li>Counter-offer management and client updates</li>
+              </ul>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button
+                onClick={handleStartTrial}
+                className="bg-gradient-to-r from-[#1e3a5f] to-[#2563eb] hover:from-[#2d4a6f] hover:to-[#3b5998] text-white px-8 py-6 text-lg w-full"
+              >
+                Start Free Trial
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleViewPricing}
+                className="px-8 py-6 text-lg w-full"
+              >
+                View Pricing
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   // Show upgrade screen if limit reached or trial expired
   if (showUpgradePrompt) {
