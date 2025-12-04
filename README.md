@@ -14,6 +14,10 @@ Create a `.env` file (or Cloudflare Pages project variables) with:
 ```
 VITE_SUPABASE_URL=...
 VITE_SUPABASE_ANON_KEY=...
+VITE_STRIPE_PUBLISHABLE_KEY=pk_live_or_test_xxx
+VITE_STRIPE_BUDGET_BUTTON_ID=buy_btn_xxx   # optional, overrides fallback
+VITE_STRIPE_PRO_BUTTON_ID=buy_btn_xxx      # optional, overrides fallback
+VITE_STRIPE_TEAM_BUTTON_ID=buy_btn_xxx     # optional, overrides fallback
 ```
 
 ## Supabase Edge Functions
