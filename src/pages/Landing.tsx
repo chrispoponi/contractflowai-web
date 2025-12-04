@@ -27,20 +27,6 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen">
-      <style>
-        {`
-          [class*="base44-widget"],
-          [class*="base44-editor"],
-          [id*="base44-widget"],
-          [id*="base44-editor"] {
-            display: none !important;
-            visibility: hidden !important;
-            opacity: 0 !important;
-            pointer-events: none !important;
-          }
-        `}
-      </style>
-
       <nav className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
