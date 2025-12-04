@@ -39,9 +39,7 @@ const planDefinitions: Plan[] = [
     features: ['2 contracts / month', 'AI analysis', 'Calendar tracking', 'Email reminders', 'Counter offers', 'Mobile optimized'],
     tier: 'budget',
     ctaText: 'Get Started',
-    stripeBuyButtonId:
-      import.meta.env.VITE_STRIPE_BUDGET_BUTTON_ID ??
-      'buy_btn_bJeeV52Z5f5m3sD6Bnd7q05_01JH19V6VYFH9X1SQJ40AXT4TP'
+    stripeBuyButtonId: import.meta.env.VITE_STRIPE_BUDGET_BUTTON_ID ?? 'buy_btn_1SGsHg0ONIDdV6FnDvFyVTX7'
   },
   {
     name: 'Professional',
@@ -53,9 +51,7 @@ const planDefinitions: Plan[] = [
     tier: 'professional',
     highlighted: true,
     ctaText: 'Get Started',
-    stripeBuyButtonId:
-      import.meta.env.VITE_STRIPE_PRO_BUTTON_ID ??
-      'buy_btn_eVqbIT7fl6yQd3d7Frd7q04_01JH19VK68WDCK1QW8SB3QEW3Z'
+    stripeBuyButtonId: import.meta.env.VITE_STRIPE_PRO_BUTTON_ID ?? 'buy_btn_1SGPxr0ONIDdV6FnqhxWOEDx'
   },
   {
     name: 'Team',
@@ -66,9 +62,7 @@ const planDefinitions: Plan[] = [
     features: ['Unlimited contracts', 'Up to 10 agents', 'Team dashboard', 'Shared calendar', 'Custom checklists', 'Account manager'],
     tier: 'team',
     ctaText: 'Get Started',
-    stripeBuyButtonId:
-      import.meta.env.VITE_STRIPE_TEAM_BUTTON_ID ??
-      'buy_btn_bJe3cngPVg9q1kvbVHd7q02_01JH19X4EYV76C1HBAVD732563'
+    stripeBuyButtonId: import.meta.env.VITE_STRIPE_TEAM_BUTTON_ID ?? 'buy_btn_1Saiu70ONIDdV6Fn9jVUKJtD'
   }
 ]
 
