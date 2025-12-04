@@ -90,19 +90,23 @@ export default function Layout({ children, currentPageName }) {
   const location = useLocation();
   const [user, setUser] = React.useState(null);
   const [authError, setAuthError] = React.useState(null);
+  const [isAuthenticated, setIsAuthenticated] = React.useState(null);
+  const [authChecked, setAuthChecked] = React.useState(false);
 
   // Public pages that don't need auth or sidebar
   const publicPages = ['Landing', 'Pricing', 'Privacy', 'Home'];
+  const semiPublicPages = ['Upload'];
   const isPublicPage = publicPages.includes(currentPageName);
+  const isSemiPublicPage = semiPublicPages.includes(currentPageName);
 
   // Cache user data in sessionStorage for faster subsequent loads
   React.useEffect(() => {
     if (!isPublicPage) {
-      loadUser();
+      loadUser(!isSemiPublicPage);
     }
-  }, [isPublicPage]);
+  }, [isPublicPage, isSemiPublicPage]);
 
-  const loadUser = async () => {
+  const loadUser = async (shouldRedirect = true) => {
     try {
       // Check cache first
       const cachedUser = sessionStorage.getItem('user_data');
@@ -113,11 +117,16 @@ export default function Layout({ children, currentPageName }) {
       // Check if authenticated first
       const isAuth = await base44.auth.isAuthenticated();
       console.log("🔐 Is authenticated:", isAuth);
+      setIsAuthenticated(isAuth);
       
       if (!isAuth) {
-        console.log("❌ Not authenticated, redirecting to login");
+        console.log("❌ Not authenticated");
         sessionStorage.removeItem('user_data');
-        base44.auth.redirectToLogin(window.location.pathname);
+        if (shouldRedirect) {
+          base44.auth.redirectToLogin(window.location.pathname);
+        } else {
+          setAuthError(null);
+        }
         return;
       }
       
@@ -139,10 +148,16 @@ export default function Layout({ children, currentPageName }) {
       
       sessionStorage.removeItem('user_data'); // Clear cache if loading fails
       
-      // Redirect to login after a short delay to show error
-      setTimeout(() => {
-        base44.auth.redirectToLogin(window.location.pathname);
-      }, 2000);
+      if (shouldRedirect) {
+        // Redirect to login after a short delay to show error
+        setTimeout(() => {
+          base44.auth.redirectToLogin(window.location.pathname);
+        }, 2000);
+      } else {
+        setAuthError(null);
+      }
+    } finally {
+      setAuthChecked(true);
     }
   };
 
@@ -153,8 +168,10 @@ export default function Layout({ children, currentPageName }) {
     await base44.auth.logout();
   };
 
-  // If it's a public page, just render children without sidebar or auth
-  if (isPublicPage) {
+  const shouldShowPublicShell = isPublicPage || (isSemiPublicPage && isAuthenticated !== true);
+
+  // If it's a public page (or semi-public without auth), render children without sidebar or auth
+  if (shouldShowPublicShell) {
     return (
       <>
         <style>
@@ -186,6 +203,14 @@ export default function Layout({ children, currentPageName }) {
         </style>
         {children}
       </>
+    );
+  }
+
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1e3a5f]" />
+      </div>
     );
   }
 
