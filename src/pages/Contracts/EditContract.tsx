@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
+import { Link } from 'react-router-dom'
 
 interface UploadFormState {
   title: string
@@ -110,6 +111,24 @@ export default function EditContract() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
+      {!user ? (
+        <Card className="border border-slate-200 shadow-lg">
+          <CardHeader>
+            <CardTitle>Upload contracts after starting your free trial</CardTitle>
+            <p className="text-sm text-slate-500">
+              Create an account or sign in to unlock AI contract parsing, calendar sync, and automated reminders.
+            </p>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <Button asChild>
+              <Link to="/pricing">Start free trial</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link to="/login">Log in</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
       <Card>
         <CardHeader>
           <CardTitle>Upload a contract</CardTitle>
@@ -178,6 +197,7 @@ export default function EditContract() {
           </form>
         </CardContent>
       </Card>
+      )}
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Route, Routes } from 'react-router-dom'
 import Layout from '@/pages/Layout'
 import Dashboard from '@/pages/Dashboard'
 import EditContract from '@/pages/Contracts/EditContract'
@@ -20,7 +20,6 @@ import Organizations from '@/pages/Organizations'
 import Profile from '@/pages/Profile'
 import TimelineGenerator from '@/pages/TimelineGenerator'
 import Settings from '@/pages/Settings'
-import ProtectedRoute from '@/components/routing/ProtectedRoute'
 import { Toaster } from '@/components/ui/toaster'
 import AuthLogin from '@/pages/Auth/Login'
 import AuthSignup from '@/pages/Auth/Signup'
@@ -46,14 +45,7 @@ function App() {
         <Route path="/privacy" element={<Privacy />} />
         <Route element={<Layout />}>
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route
-            path="/upload"
-            element={
-              <ProtectedRoute redirectTo="/pricing">
-                <EditContract />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/upload" element={<EditContract />} />
           <Route path="/calendar" element={<Calendar />} />
           <Route path="/contracts/:contractId" element={<ContractDetails />} />
           <Route path="/contracts/:contractId/counter-offer" element={<UploadCounterOffer />} />
