@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   addMonths,
@@ -29,7 +29,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import AddToCalendarButton from '@/components/ui/AddToCalendarButton'
 import { useToast } from '@/components/ui/use-toast'
 import type { Tables } from '@/lib/supabase'
-import { useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 
 interface Contract extends Tables<'contracts'> {
   _using_original_dates?: boolean
@@ -61,7 +61,6 @@ const colorMap = {
 export default function CalendarPage() {
   const { user } = useAuth()
   const { toast } = useToast()
-  const navigate = useNavigate()
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [selectedContracts, setSelectedContracts] = useState<Set<string>>(new Set())
@@ -84,12 +83,6 @@ export default function CalendarPage() {
       return data as Contract[]
     }
   })
-
-  useEffect(() => {
-    if (!user) {
-      navigate('/login')
-    }
-  }, [user, navigate])
 
   const activeContracts = useMemo(() => buildActiveContracts(contracts), [contracts])
   const events = useMemo(() => buildEvents(activeContracts), [activeContracts])
@@ -178,8 +171,23 @@ export default function CalendarPage() {
 
   if (!user) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-slate-500" />
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+        <Card className="max-w-xl border border-slate-200 shadow-lg">
+          <CardHeader>
+            <CardTitle className="text-2xl font-semibold text-slate-900">Calendar available after signup</CardTitle>
+            <p className="text-sm text-slate-500">
+              Upload your first contract to unlock timeline tracking, calendar sync, and client updates.
+            </p>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <Button asChild>
+              <Link to="/pricing">Start free trial</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link to="/login">Log in</Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     )
   }
