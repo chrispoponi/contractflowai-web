@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowRight, Bell, Calendar, CheckCircle, FileText } from 'lucide-react'
+import { ArrowRight, Bell, Calendar, CheckCircle, FileText, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { useAuth } from '@/components/providers/AuthProvider'
