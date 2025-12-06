@@ -137,7 +137,11 @@ export default function Dashboard() {
     <div className="space-y-8 px-4 py-8 lg:px-8">
       <header className="flex flex-col gap-2">
         <p className="text-sm uppercase tracking-wide text-slate-500">Overview</p>
-        <h1 className="text-3xl font-semibold text-slate-900">Welcome back, {user?.user_metadata?.full_name ?? user?.email}</h1>
+        <h1 className="text-3xl font-semibold text-slate-900">
+          {`Welcome back, ${
+            user?.user_metadata?.full_name?.split(' ')?.[0] ?? user?.user_metadata?.full_name ?? user?.email ?? 'Agent'
+          }!`}
+        </h1>
         <p className="text-sm text-slate-500">Supabase-secured workspace with end-to-end typed access.</p>
       </header>
 
