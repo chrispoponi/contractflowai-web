@@ -26,67 +26,114 @@ export default function Landing() {
   }
 
   return (
-    <div className="min-h-screen">
-      <nav className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-[#1e3a5f] to-[#2563eb] rounded-xl flex items-center justify-center shadow-lg">
-                <FileText className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-2xl font-bold text-gray-900">ContractFlowAI</span>
+    <div className="min-h-screen bg-slate-50 text-slate-900">
+      <nav className="sticky top-0 z-50 border-b border-white/60 bg-white/80 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-blue-500 text-white shadow-lg">
+              <FileText className="h-5 w-5" />
             </div>
-            <div className="flex items-center gap-4">
-              <Link to="/pricing">
-                <Button variant="ghost">Pricing</Button>
-              </Link>
-              <Button variant="outline" onClick={handleSignIn}>
-                Sign In
-              </Button>
-              <Button
-                onClick={handleGetStarted}
-                className="bg-gradient-to-r from-[#1e3a5f] to-[#2563eb] hover:from-[#2d4a6f] hover:to-[#3b5998] text-white"
-              >
-                Try It Free
-              </Button>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">ContractFlowAI</p>
+              <p className="text-base font-semibold text-slate-900">Agent Co-pilot</p>
             </div>
+          </div>
+          <div className="hidden items-center gap-8 text-sm text-slate-600 md:flex">
+            <Link to="/pricing" className="hover:text-slate-900">
+              Pricing
+            </Link>
+            <a href="#benefits" className="hover:text-slate-900">
+              Benefits
+            </a>
+            <a href="#how-it-works" className="hover:text-slate-900">
+              How it works
+            </a>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button variant="outline" onClick={handleSignIn}>
+              Sign In
+            </Button>
+            <Button onClick={handleGetStarted} className="bg-indigo-600 hover:bg-indigo-700">
+              Try It Free
+            </Button>
           </div>
         </div>
       </nav>
 
-      <section className="pt-20 pb-16 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center max-w-3xl mx-auto">
-            <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
-              Never Miss a Real Estate
-              <span className="block text-transparent bg-clip-text bg-gradient-to-r from-[#1e3a5f] to-[#2563eb]">
-                Deadline Again
-              </span>
+      <section className="relative overflow-hidden bg-gradient-to-br from-slate-50 via-white to-slate-100">
+        <div className="absolute inset-0 opacity-40 blur-3xl">
+          <div className="mx-auto h-96 w-96 rounded-full bg-gradient-to-r from-indigo-200 to-sky-100"></div>
+        </div>
+        <div className="relative mx-auto grid max-w-6xl gap-12 px-4 py-16 sm:px-6 lg:grid-cols-2 lg:items-center lg:px-8">
+          <div className="space-y-6">
+            <span className="inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-indigo-700 shadow-sm">
+              <Sparkles className="h-3.5 w-3.5" />
+              AI timeline concierge for agents
+            </span>
+            <h1 className="text-4xl font-semibold leading-tight text-slate-900 sm:text-5xl">
+              Delegate contract dates to AI, keep clients confident, and win back hours each week.
             </h1>
-            <p className="text-xl text-gray-600 mb-8">
-              AI-powered transaction management that keeps you on track. Upload contracts, get automatic reminders, and close deals faster.
+            <p className="text-lg text-slate-600">
+              Upload a PDF and ContractFlowAI extracts every critical milestone, pushes it to your calendar and phone, and shares branded timelines your clients rave about.
             </p>
-            <div className="flex gap-4 justify-center flex-wrap">
+            <div className="flex flex-wrap gap-3">
               <Button
                 size="lg"
                 onClick={handleGetStarted}
-                className="bg-gradient-to-r from-[#1e3a5f] to-[#2563eb] hover:from-[#2d4a6f] hover:to-[#3b5998] text-white px-8 py-6 text-lg"
+                className="flex-1 bg-gradient-to-r from-indigo-600 via-blue-600 to-sky-500 text-base shadow-lg hover:from-indigo-700 hover:to-sky-600 sm:flex-none"
               >
                 Start Free Trial
-                <ArrowRight className="w-5 h-5 ml-2" />
+                <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
-              <Link to="/pricing">
-                <Button size="lg" variant="outline" className="px-8 py-6 text-lg">
-                  View Pricing
-                </Button>
-              </Link>
+              <Button size="lg" variant="outline" className="flex-1 text-base sm:flex-none" onClick={() => navigate('/pricing')}>
+                See plans
+              </Button>
             </div>
-            <p className="text-sm text-gray-500 mt-4">60-day free trial • No credit card required • Cancel anytime</p>
+            <div className="grid gap-4 rounded-2xl border border-slate-100 bg-white/70 p-5 shadow-sm backdrop-blur">
+              <div className="flex items-center justify-between text-sm text-slate-600">
+                <span>Agents onboarded</span>
+                <strong className="text-lg text-slate-900">320+</strong>
+              </div>
+              <div className="flex items-center justify-between text-sm text-slate-600">
+                <span>Deadlines tracked automatically</span>
+                <strong className="text-lg text-slate-900">12,400+</strong>
+              </div>
+              <div className="flex items-center justify-between text-sm text-slate-600">
+                <span>Time saved per contract</span>
+                <strong className="text-lg text-emerald-600">4.5 hrs avg</strong>
+              </div>
+            </div>
+          </div>
+          <div className="relative">
+            <div className="rounded-3xl border border-indigo-100 bg-white p-6 shadow-2xl">
+              <div className="mb-6 flex items-center justify-between">
+                <div>
+                  <p className="text-sm uppercase tracking-wide text-slate-500">AI summary preview</p>
+                  <p className="text-2xl font-semibold text-slate-900">118 W Seaside Way</p>
+                </div>
+                <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">Ready</span>
+              </div>
+              <ul className="space-y-4 text-sm text-slate-600">
+                {[
+                  'Inspection deadline surfaced + synced to Google Calendar.',
+                  'AI summary highlights financing timeline in plain English.',
+                  'Clients receive branded timeline email automatically.'
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2 rounded-xl border border-slate-100 bg-slate-50/80 p-3">
+                    <CheckCircle className="mt-0.5 h-4 w-4 text-emerald-500" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-6 rounded-2xl bg-gradient-to-r from-indigo-600 to-blue-500 p-4 text-sm text-white shadow-lg">
+                “A real estate assistant that never sleeps. I forward a contract and the system handles the dates, clients, and reminders.” — Jackie P.
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      <section className="py-20 px-4 sm:px-6 lg:px-8">
+      <section id="benefits" className="px-4 py-20 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">Everything You Need to Stay On Track</h2>
@@ -133,6 +180,36 @@ export default function Landing() {
               </Card>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section className="py-16 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-slate-900 via-indigo-900 to-blue-900 text-white" id="how-it-works">
+        <div className="mx-auto grid max-w-5xl gap-8 md:grid-cols-3">
+          {[
+            {
+              step: 'Step 1',
+              title: 'Upload any PDF',
+              copy: 'Drag & drop. We detect purchase price, contingencies, counter offers, and client info.'
+            },
+            {
+              step: 'Step 2',
+              title: 'AI builds your checklist',
+              copy: 'We normalize dates, fill missing deadlines, and flag anything that needs attention.'
+            },
+            {
+              step: 'Step 3',
+              title: 'Share timelines & automate updates',
+              copy: 'Push to Google/Apple Calendar, send branded client timelines, and let reminders run in the background.'
+            }
+          ].map(({ step, title, copy }) => (
+            <Card key={title} className="border-white/10 bg-white/5 text-white backdrop-blur">
+              <CardContent className="space-y-3 p-6">
+                <span className="text-xs font-semibold uppercase tracking-[0.25em] text-white/70">{step}</span>
+                <h3 className="text-xl font-semibold">{title}</h3>
+                <p className="text-sm text-white/80">{copy}</p>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       </section>
 

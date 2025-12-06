@@ -49,13 +49,16 @@ type ContractEvent = {
   usingOriginalDates?: boolean
 }
 
-const colorMap = {
-  Inspection: 'bg-blue-500',
-  'Inspection Response': 'bg-purple-500',
-  'Loan Contingency': 'bg-orange-500',
-  Appraisal: 'bg-green-500',
-  'Final Walkthrough': 'bg-indigo-500',
-  Closing: 'bg-red-500'
+const colorMap: Record<
+  DateTypeKey,
+  { chip: string; border: string; text: string; dot: string }
+> = {
+  Inspection: { chip: 'bg-sky-50', border: 'border-sky-200', text: 'text-sky-800', dot: 'bg-sky-500' },
+  'Inspection Response': { chip: 'bg-fuchsia-50', border: 'border-fuchsia-200', text: 'text-fuchsia-800', dot: 'bg-fuchsia-500' },
+  'Loan Contingency': { chip: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-800', dot: 'bg-amber-500' },
+  Appraisal: { chip: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-800', dot: 'bg-emerald-500' },
+  'Final Walkthrough': { chip: 'bg-indigo-50', border: 'border-indigo-200', text: 'text-indigo-800', dot: 'bg-indigo-500' },
+  Closing: { chip: 'bg-rose-50', border: 'border-rose-200', text: 'text-rose-800', dot: 'bg-rose-500' }
 }
 
 export default function CalendarPage() {
@@ -274,7 +277,9 @@ export default function CalendarPage() {
               {selectedEvents.length === 0 && <p className="text-sm text-slate-500">No events on this date.</p>}
               {selectedEvents.map((event) => (
                 <div key={`${event.contractId}-${event.type}-${event.date}`} className="rounded-xl border border-slate-200 p-4">
-                  <Badge className={`${colorMap[event.type]} text-white`}>{event.type}</Badge>
+                  <Badge className={`border ${colorMap[event.type].border} ${colorMap[event.type].chip} ${colorMap[event.type].text}`}>
+                    {event.type}
+                  </Badge>
                   <p className="mt-2 text-base font-semibold text-slate-900">{event.address}</p>
                   <p className="text-sm text-slate-500">{format(new Date(event.date), 'MMM d, yyyy')}</p>
                   <div className="mt-3 text-xs text-slate-500">
@@ -467,10 +472,10 @@ function CalendarGrid({
               {events.slice(0, 3).map((event) => (
                 <div
                   key={`${event.contractId}-${event.type}-${event.date}`}
-                  className="flex items-center gap-2 rounded-lg bg-slate-50 px-2 py-1"
+                  className={`flex items-center gap-2 rounded-lg border px-2 py-1 ${colorMap[event.type].chip} ${colorMap[event.type].border}`}
                 >
-                  <span className={`h-2 w-2 rounded-full ${colorMap[event.type]}`} />
-                  <span className="flex-1 truncate text-xs text-slate-600">{event.type}</span>
+                  <span className={`h-2 w-2 rounded-full ${colorMap[event.type].dot}`}></span>
+                  <span className={`flex-1 truncate text-xs ${colorMap[event.type].text}`}>{event.type}</span>
                 </div>
               ))}
               {events.length > 3 && <p className="text-xs text-slate-400">+{events.length - 3} more</p>}
