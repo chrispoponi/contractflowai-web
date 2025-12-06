@@ -44,15 +44,16 @@ function App() {
         <Route path="/landing" element={<Landing />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/privacy" element={<Privacy />} />
-        <Route
-          element={
-            <ProtectedRoute>
-              <Layout />
-            </ProtectedRoute>
-          }
-        >
+        <Route element={<Layout />}>
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/upload" element={<EditContract />} />
+          <Route
+            path="/upload"
+            element={
+              <ProtectedRoute redirectTo="/pricing">
+                <EditContract />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/calendar" element={<Calendar />} />
           <Route path="/contracts/:contractId" element={<ContractDetails />} />
           <Route path="/contracts/:contractId/counter-offer" element={<UploadCounterOffer />} />
