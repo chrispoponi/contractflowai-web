@@ -69,7 +69,6 @@ function App() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/timeline" element={<TimelineGenerator />} />
           <Route path="/settings" element={<Settings />} />
-          <Route index element={<Navigate to="/dashboard" replace />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>
