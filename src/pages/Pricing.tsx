@@ -142,10 +142,8 @@ export default function PricingPage() {
         {plans.map((plan) => (
           <Card
             key={plan.name}
-            className={`relative flex h-full flex-col border-2 ${
-              plan.highlighted
-                ? 'border-[#1e3a5f] shadow-2xl lg:scale-105'
-                : 'border-gray-200 hover:border-gray-300 hover:shadow-lg'
+            className={`relative border-2 ${
+              plan.highlighted ? 'border-[#1e3a5f] shadow-2xl lg:scale-105' : 'border-gray-200 hover:border-gray-300 hover:shadow-lg'
             }`}
           >
             {plan.highlighted && (
@@ -155,48 +153,55 @@ export default function PricingPage() {
                 </span>
               </div>
             )}
-            <CardHeader className="px-6 pb-6 pt-10 text-center">
-              <div
-                className={`mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg ${
-                  plan.highlighted ? 'bg-[#1e3a5f]' : 'bg-gray-100'
-                }`}
-              >
-                <plan.icon className={`h-6 w-6 ${plan.highlighted ? 'text-white' : 'text-gray-600'}`} />
-              </div>
-              <CardTitle className="text-2xl font-bold text-gray-900">{plan.name}</CardTitle>
-              <p className="mt-1 text-sm text-gray-500">{plan.description}</p>
-              <div className="mt-4 flex items-baseline justify-center gap-1">
-                <span className="text-5xl font-bold text-gray-900">${plan.price}</span>
-                <span className="text-sm text-gray-500">/{plan.period}</span>
-              </div>
-            </CardHeader>
-            <CardContent className="flex flex-1 flex-col px-6 pb-10 pt-0">
-              <div className="space-y-3 text-sm text-gray-700">
-                {plan.features.map((feature) => (
-                  <div key={feature} className="flex items-center gap-3">
-                    <Check className="h-4 w-4 text-green-600" />
-                    <span>{feature}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-6 pt-2">
-                {plan.tier === 'trial' ? (
-                  <Button
-                    onClick={handleTrialStart}
-                    disabled={loading || user?.app_metadata?.subscription_tier === plan.tier}
-                    className="w-full bg-black text-white hover:bg-gray-900"
-                  >
-                    {user?.app_metadata?.subscription_tier === plan.tier ? 'Current Plan' : plan.ctaText}
-                  </Button>
-                ) : plan.stripeBuyButtonId && stripeLoaded && publishableKey ? (
-                  <stripe-buy-button buy-button-id={plan.stripeBuyButtonId} publishable-key={publishableKey}></stripe-buy-button>
-                ) : (
-                  <Button disabled className="w-full">
-                    Loading...
-                  </Button>
-                )}
-              </div>
-            </CardContent>
+            <div className="flex h-full flex-col">
+              <CardHeader className="px-6 pb-6 pt-10 text-center">
+                <div
+                  className={`mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg ${
+                    plan.highlighted ? 'bg-[#1e3a5f]' : 'bg-gray-100'
+                  }`}
+                >
+                  <plan.icon className={`h-6 w-6 ${plan.highlighted ? 'text-white' : 'text-gray-600'}`} />
+                </div>
+                <CardTitle className="text-2xl font-bold text-gray-900">{plan.name}</CardTitle>
+                <p className="mt-1 text-sm text-gray-500">{plan.description}</p>
+                <div className="mt-4 flex items-baseline justify-center gap-1">
+                  <span className="text-5xl font-bold text-gray-900">${plan.price}</span>
+                  <span className="text-sm text-gray-500">/{plan.period}</span>
+                </div>
+              </CardHeader>
+              <CardContent className="flex flex-1 flex-col px-6 pb-10 pt-0">
+                <div className="space-y-3 text-sm text-gray-700">
+                  {plan.features.map((feature) => (
+                    <div key={feature} className="flex items-center gap-3">
+                      <Check className="h-4 w-4 text-green-600" />
+                      <span>{feature}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-6 pt-2">
+                  {plan.tier === 'trial' ? (
+                    <Button
+                      onClick={handleTrialStart}
+                      disabled={loading || user?.app_metadata?.subscription_tier === plan.tier}
+                      className="w-full bg-black text-white hover:bg-gray-900"
+                    >
+                      {user?.app_metadata?.subscription_tier === plan.tier ? 'Current Plan' : plan.ctaText}
+                    </Button>
+                  ) : plan.stripeBuyButtonId && stripeLoaded && publishableKey ? (
+                    <div className="w-full">
+                      <stripe-buy-button
+                        buy-button-id={plan.stripeBuyButtonId}
+                        publishable-key={publishableKey}
+                      ></stripe-buy-button>
+                    </div>
+                  ) : (
+                    <Button disabled className="w-full">
+                      Loading...
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </div>
           </Card>
         ))}
       </section>
