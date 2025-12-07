@@ -58,29 +58,23 @@ export default function UploadContract() {
 
       toast({ title: 'Uploaded', description: 'Parsing…' })
 
-      const { data: sessionData } = await supabase.auth.getSession()
-      const accessToken = sessionData?.session?.access_token
-      if (!accessToken) {
-        console.error('Missing access token.')
-        toast({ title: 'Auth error', description: 'Please log in again.', variant: 'destructive' })
-        setUploading(false)
-        return
+      const payload = {
+        storagePath: filePath,
+        userId: user.id
       }
 
+      console.log('📤 Invoking contractParsing with:', payload)
+
       const { data: parseData, error: parseError } = await supabase.functions.invoke('contractParsing', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: {
-          storagePath: filePath,
-          userId: user.id
-        }
+        body: payload
       })
 
+      console.log('📥 contractParsing response:', { data: parseData, error: parseError })
+
+      const session = await supabase.auth.getSession()
+      console.log('👤 Current session:', session)
+
       if (parseError) {
-        console.error('Parse error:', parseError)
         toast({ title: 'Parsing failed', description: 'Our team was notified.', variant: 'destructive' })
         setUploading(false)
         return
