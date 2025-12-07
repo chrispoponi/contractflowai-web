@@ -142,7 +142,11 @@ export default function PricingPage() {
         {plans.map((plan) => (
           <Card
             key={plan.name}
-            className={`relative border-2 ${plan.highlighted ? 'border-[#1e3a5f] shadow-2xl lg:scale-105' : 'border-gray-200 hover:border-gray-300 hover:shadow-lg'}`}
+            className={`relative flex h-full flex-col border-2 ${
+              plan.highlighted
+                ? 'border-[#1e3a5f] shadow-2xl lg:scale-105'
+                : 'border-gray-200 hover:border-gray-300 hover:shadow-lg'
+            }`}
           >
             {plan.highlighted && (
               <div className="absolute -top-4 left-1/2 -translate-x-1/2">
@@ -165,7 +169,17 @@ export default function PricingPage() {
                 <span className="text-5xl font-bold text-gray-900">${plan.price}</span>
                 <span className="text-sm text-gray-500">/{plan.period}</span>
               </div>
-              <div className="mt-6">
+            </CardHeader>
+            <CardContent className="flex flex-1 flex-col px-6 pb-10 pt-0">
+              <div className="space-y-3 text-sm text-gray-700">
+                {plan.features.map((feature) => (
+                  <div key={feature} className="flex items-center gap-3">
+                    <Check className="h-4 w-4 text-green-600" />
+                    <span>{feature}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-6 pt-2">
                 {plan.tier === 'trial' ? (
                   <Button
                     onClick={handleTrialStart}
@@ -181,16 +195,6 @@ export default function PricingPage() {
                     Loading...
                   </Button>
                 )}
-              </div>
-            </CardHeader>
-            <CardContent className="px-6 pb-10">
-              <div className="space-y-3">
-                {plan.features.map((feature) => (
-                  <div key={feature} className="flex items-center gap-3 text-sm text-gray-700">
-                    <Check className="h-4 w-4 text-green-600" />
-                    <span>{feature}</span>
-                  </div>
-                ))}
               </div>
             </CardContent>
           </Card>
