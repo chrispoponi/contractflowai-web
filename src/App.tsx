@@ -2,6 +2,7 @@ import { Route, Routes } from 'react-router-dom'
 import Layout from '@/pages/Layout'
 import Dashboard from '@/pages/Dashboard'
 import EditContract from '@/pages/Contracts/EditContract'
+import UploadContract from '@/pages/UploadContract'
 import UploadCounterOffer from '@/pages/Contracts/UploadCounterOffer'
 import Calendar from '@/pages/Calendar'
 import ContractDetails from '@/pages/Contracts/ContractDetails'
@@ -52,7 +53,7 @@ function App() {
         <Route path="/privacy" element={<Privacy />} />
         <Route element={<Layout />}>
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/upload" element={<EditContract />} />
+          <Route path="/upload" element={<UploadContract />} />
           <Route path="/calendar" element={<Calendar />} />
           <Route path="/contracts/:contractId" element={<ContractDetails />} />
           <Route path="/contracts/:contractId/counter-offer" element={<UploadCounterOffer />} />
