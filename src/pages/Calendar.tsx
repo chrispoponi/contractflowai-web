@@ -30,6 +30,8 @@ import AddToCalendarButton from '@/components/ui/AddToCalendarButton'
 import { useToast } from '@/components/ui/use-toast'
 import type { Tables } from '@/lib/supabase'
 import { Link } from 'react-router-dom'
+import { ColorLegend } from '@/components/calendar/ColorLegend'
+import { SyncDatesMenu } from '@/components/calendar/SyncDatesMenu'
 
 interface Contract extends Tables<'contracts'> {
   _using_original_dates?: boolean
@@ -198,37 +200,44 @@ export default function CalendarPage() {
   return (
     <div className="px-4 py-8 sm:px-6 lg:px-10">
       <div className="mx-auto max-w-7xl space-y-8">
-        <header className="flex flex-col gap-4 border-b border-slate-200 pb-6 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-sm uppercase tracking-wide text-indigo-600">Operations Center</p>
-            <h1 className="mt-2 text-4xl font-bold text-slate-900">Contract Calendar</h1>
-            <p className="text-sm text-slate-500">
-              {user?.organization_role === 'team_lead' ? 'All team contracts and timelines' : 'Deadlines from every active transaction'}
-            </p>
+        <div className="flex flex-col gap-4 border-b border-slate-200 pb-6">
+          <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h1 className="text-4xl font-bold text-slate-900">Contract Calendar</h1>
+              <p className="text-sm text-slate-500">
+                {user?.organization_role === 'team_lead'
+                  ? 'All team contracts and timelines'
+                  : 'Deadlines from every active transaction'}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                onClick={() => {
+                  setSendResults(null)
+                  setShowSendModal(true)
+                }}
+                disabled={emailableContracts.length === 0}
+                className="bg-emerald-600 text-white shadow-lg hover:bg-emerald-700"
+              >
+                <Send className="mr-2 h-4 w-4" />
+                Email Timelines ({emailableContracts.length})
+              </Button>
+              <SyncDatesMenu />
+              <AddToCalendarButton
+                events={events.map((event) => ({
+                  title: `${event.type} - ${event.address}`,
+                  date: new Date(event.date),
+                  description: event.address,
+                  location: event.address
+                }))}
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg"
+              />
+            </div>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <Button
-              onClick={() => {
-                setSendResults(null)
-                setShowSendModal(true)
-              }}
-              disabled={emailableContracts.length === 0}
-              className="bg-green-600 text-white shadow-lg hover:bg-green-700"
-            >
-              <Send className="mr-2 h-4 w-4" />
-              Email Timelines ({emailableContracts.length})
-            </Button>
-            <AddToCalendarButton
-              events={events.map((event) => ({
-                title: `${event.type} - ${event.address}`,
-                date: new Date(event.date),
-                description: event.address,
-                location: event.address
-              }))}
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg"
-            />
-          </div>
-        </header>
+
+          <ColorLegend />
+        </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
           <Card className="lg:col-span-2 shadow-lg">
