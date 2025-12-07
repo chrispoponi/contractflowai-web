@@ -114,7 +114,14 @@ serve(async (req) => {
   }
 
   try {
-    const body = await req.json()
+    let body
+    try {
+      body = await req.json()
+      console.log('[contractParsing] Parsed JSON body:', body)
+    } catch (parseError) {
+      console.error('[contractParsing] Failed to parse JSON body:', parseError)
+      return httpResponse(400, { error: 'Invalid JSON input', details: parseError instanceof Error ? parseError.message : String(parseError) })
+    }
     const { storagePath, userId, contractId, persist = true } = body ?? {}
 
     if (!storagePath || !userId) {
