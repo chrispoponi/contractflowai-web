@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/components/providers/AuthProvider'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -16,7 +16,7 @@ const sanitizeFileName = (name: string) =>
     .replace(/[^a-z0-9.-]/g, '')
 
 export default function UploadContract() {
-  const { user } = useAuth()
+  const { user, loading } = useAuth()
   const navigate = useNavigate()
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -35,7 +35,7 @@ export default function UploadContract() {
   }
 
   const handleUpload = async () => {
-    if (!user) {
+    if (!user?.id) {
       toast({ title: 'Sign in required', description: 'Log in to upload contracts.', variant: 'destructive' })
       return
     }
@@ -109,17 +109,16 @@ export default function UploadContract() {
     }
   }
 
-  if (!user) {
+  if (loading) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-12">
-        <Card>
-          <CardHeader>
-            <CardTitle>Upload a contract</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-slate-600">Sign in to store and parse contracts with AI assistance.</CardContent>
-        </Card>
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-indigo-200 border-t-transparent" />
       </div>
     )
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />
   }
 
   return (
