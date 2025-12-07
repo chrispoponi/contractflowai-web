@@ -12,7 +12,9 @@ import {
   Building2,
   Settings as SettingsIcon,
   BellRing,
-  TimerReset
+  TimerReset,
+  MessageSquare,
+  ShieldCheck
 } from 'lucide-react'
 import {
   Sidebar,
@@ -67,6 +69,11 @@ const toolsItems = [
     title: 'Timeline Generator',
     url: '/timeline',
     icon: TimerReset
+  },
+  {
+    title: 'Feedback',
+    url: '/feedback',
+    icon: MessageSquare
   }
 ]
 
@@ -93,9 +100,18 @@ const managementItems = [
   }
 ]
 
+const adminItems = [
+  {
+    title: 'Admin Users',
+    url: '/admin/users',
+    icon: ShieldCheck
+  }
+]
+
 export default function Layout() {
   const location = useLocation()
   const { user, signOut } = useAuth()
+  const isAdmin = user?.app_metadata?.role === 'admin'
 
   const initials = useMemo(() => {
     if (!user?.user_metadata?.full_name) return user?.email?.[0]?.toUpperCase() ?? 'U'
@@ -175,6 +191,25 @@ export default function Layout() {
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
+            {isAdmin && (
+              <SidebarGroup>
+                <SidebarGroupContent>
+                  <p className="px-4 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Admin</p>
+                  <SidebarMenu>
+                    {adminItems.map((item) => (
+                      <SidebarMenuItem key={item.title}>
+                        <SidebarMenuButton asChild isActive={location.pathname === item.url}>
+                          <Link to={item.url} className="flex items-center gap-3 px-4 py-3">
+                            <item.icon className="h-5 w-5" />
+                            <span>{item.title}</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            )}
           </SidebarContent>
           <SidebarFooter className="border-t border-slate-100 p-4">
             <div className="flex items-center gap-3 rounded-2xl border border-slate-200 p-3">

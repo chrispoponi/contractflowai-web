@@ -144,6 +144,27 @@ export type Database = {
         Insert: Partial<Database['public']['Tables']['referrals']['Row']>
         Update: Partial<Database['public']['Tables']['referrals']['Row']>
       }
+      feedback: {
+        Row: {
+          id: string
+          user_id: string | null
+          email: string | null
+          topic: string | null
+          sentiment: string | null
+          message: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          email?: string | null
+          topic?: string | null
+          sentiment?: string | null
+          message: string
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['feedback']['Row']>
+      }
       client_updates: {
         Row: {
           id: string

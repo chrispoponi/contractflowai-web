@@ -20,6 +20,8 @@ import Organizations from '@/pages/Organizations'
 import Profile from '@/pages/Profile'
 import TimelineGenerator from '@/pages/TimelineGenerator'
 import Settings from '@/pages/Settings'
+import AdminUsers from '@/pages/AdminUsers'
+import FeedbackPage from '@/pages/Feedback'
 import { Toaster } from '@/components/ui/toaster'
 import AuthLogin from '@/pages/Auth/Login'
 import AuthSignup from '@/pages/Auth/Signup'
@@ -64,6 +66,8 @@ function App() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/timeline" element={<TimelineGenerator />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/admin/users" element={<AdminUsers />} />
+          <Route path="/feedback" element={<FeedbackPage />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>
