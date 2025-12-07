@@ -14,3 +14,23 @@ export const supabase = createClient<Database>(url, anon, {
     detectSessionInUrl: true
   }
 })
+
+const originalInvoke = supabase.functions.invoke.bind(supabase.functions)
+
+supabase.functions.invoke = async function (fn, options) {
+  const session = await supabase.auth.getSession()
+  console.log('🔵 FUNCTION INVOKE:', {
+    fn,
+    body: options?.body,
+    headers: options?.headers,
+    session: session.data.session ? { user: session.data.session.user.id } : null
+  })
+
+  const result = await originalInvoke(fn, options)
+
+  console.log('🟢 FUNCTION RESPONSE:', result)
+
+  return result
+}
+
+console.log('⚡ Supabase client initialized')
