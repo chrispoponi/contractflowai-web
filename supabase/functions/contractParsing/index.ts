@@ -54,7 +54,7 @@ serve(async (req) => {
       original_file: storagePath ?? null
     }
 
-    const summaryPath = `${SUMMARY_FOLDER}/${contractId}/summary.json`
+const summaryPath = `${SUMMARY_FOLDER}/${contractId}/summary.json`
 
     // Upload summary file
     const { error: uploadError } = await supabase.storage

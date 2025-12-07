@@ -15,11 +15,24 @@ const handleFileSelection = async (selectedFile: File | null) => {
       .upload(objectPath, selectedFile, {
         upsert: true,
         cacheControl: '3600',
-        contentType: selectedFile.type || 'application/pdf'
+        contentType: selectedFile.type || 'application/pdf',
+        metadata: { owner: user.id }
       })
 
+<<<<<<< HEAD
     if (uploadError) throw uploadError
     setStoragePath(objectPath)
+=======
+      setStatusMessage('Parsing contract with AI…')
+      const tempContractId = crypto.randomUUID()
+      const { data, error } = await supabase.functions.invoke('contractParsing', {
+        body: {
+          contractId: tempContractId,
+          storagePath: objectPath,
+          userId: user.id
+        }
+      })
+>>>>>>> cursor/migrate-project-to-supabase-and-cloudflare-pages-gpt-5.1-codex-d880
 
     setStatusMessage('Parsing contract with AI…')
 
