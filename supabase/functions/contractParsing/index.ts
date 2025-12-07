@@ -11,11 +11,25 @@ const supabase = createClient<Database>(
 const CONTRACTS_BUCKET = Deno.env.get('CONTRACTS_BUCKET') ?? 'contracts'
 const SUMMARY_FOLDER = Deno.env.get('SUMMARY_FOLDER') ?? 'summaries'
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': Deno.env.get('CORS_ORIGIN') ?? 'https://contractflowai.us',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS'
+} as Record<string, string>
+
 serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
   try {
     const { contractId, storagePath, userId } = await req.json()
-    if (!contractId || !userId)
-      return new Response(JSON.stringify({ error: 'contractId and userId required' }), { status: 400 })
+    if (!contractId || !userId) {
+      return new Response(JSON.stringify({ error: 'contractId and userId required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      })
+    }
 
     const aiSummary = `AI summary for ${contractId} stored at ${storagePath ?? 'n/a'}`
     const summaryPayload = {
@@ -49,9 +63,12 @@ serve(async (req) => {
     if (error) throw error
 
     return new Response(JSON.stringify({ success: true, summary: aiSummary, summaryPath }), {
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
     })
   } catch (error) {
-    return new Response(JSON.stringify({ error: String(error) }), { status: 500 })
+    return new Response(JSON.stringify({ error: String(error) }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    })
   }
 })
