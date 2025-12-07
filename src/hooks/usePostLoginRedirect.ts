@@ -9,13 +9,17 @@ export function usePostLoginRedirect() {
 
   useEffect(() => {
     if (isLoading) return
+    if (!session) return
 
-    if (session) {
-      const cameFromAuthPage = ['/login', '/signup', '/pricing'].includes(location.pathname)
-
-      if (cameFromAuthPage) {
-        navigate('/dashboard', { replace: true })
-      }
+    const from = (location.state as any)?.from as string | undefined
+    if (from && typeof from === 'string') {
+      navigate(from, { replace: true })
+      return
     }
-  }, [session, isLoading, location.pathname, navigate])
+
+    const authRoutes = ['/', '/login', '/signup', '/pricing']
+    if (authRoutes.includes(location.pathname)) {
+      navigate('/dashboard', { replace: true })
+    }
+  }, [session, isLoading, location.pathname, location.state, navigate])
 }
