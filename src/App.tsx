@@ -26,8 +26,11 @@ import AuthSignup from '@/pages/Auth/Signup'
 import AuthReset from '@/pages/Auth/ResetPassword'
 import NotFound from '@/pages/NotFound'
 import './App.css'
+import { usePostLoginRedirect } from '@/hooks/usePostLoginRedirect'
 
 function App() {
+  usePostLoginRedirect()
+
   return (
     <div className="bg-slate-50 text-slate-900">
       <Routes>
