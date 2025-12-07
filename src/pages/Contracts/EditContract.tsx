@@ -81,14 +81,17 @@ export default function EditContract() {
       const { error: uploadError } = await supabase.storage.from('contracts').upload(objectPath, selectedFile, {
         upsert: true,
         cacheControl: '3600',
-        contentType: selectedFile.type || 'application/pdf'
+        contentType: selectedFile.type || 'application/pdf',
+        metadata: { owner: user.id }
       })
       if (uploadError) throw uploadError
       setStoragePath(objectPath)
 
       setStatusMessage('Parsing contract with AI…')
+      const tempContractId = crypto.randomUUID()
       const { data, error } = await supabase.functions.invoke('contractParsing', {
         body: {
+          contractId: tempContractId,
           storagePath: objectPath,
           userId: user.id
         }
