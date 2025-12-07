@@ -16,11 +16,17 @@ export default function Referrals() {
   const [source, setSource] = useState('')
   const [contractId, setContractId] = useState('')
 
-  const { data: referrals = [] } = useQuery({
+  const {
+    data: referralsData,
+    isLoading,
+    error
+  } = useQuery({
     queryKey: ['referrals', user?.id],
     enabled: Boolean(user?.id),
     queryFn: () => listReferrals(user!.id)
   })
+
+  const referrals = Array.isArray(referralsData) ? referralsData : []
 
   const attachReferral = useMutation({
     mutationFn: async () => {
@@ -68,14 +74,21 @@ export default function Referrals() {
           </Button>
         </CardHeader>
         <CardContent className="space-y-3">
-          {referrals.length === 0 && <p className="text-sm text-slate-500">No referrals recorded yet.</p>}
-          {referrals.map((referral) => (
-            <div key={referral.id} className="rounded-2xl border border-slate-200 p-3 text-sm">
-              <p className="font-semibold text-slate-900">{referral.referral_source}</p>
-              <p className="text-slate-500">{referral.title}</p>
-              <p className="text-xs text-slate-400">Added {toDisplayDate(referral.created_at)}</p>
-            </div>
-          ))}
+          {error && <p className="text-sm text-red-600">Unable to load referrals: {error.message}</p>}
+          {isLoading && <p className="text-sm text-slate-500">Loading referrals…</p>}
+          {!isLoading && referrals.length === 0 && (
+            <p className="text-sm text-slate-500">No referrals recorded yet.</p>
+          )}
+          {!isLoading &&
+            referrals.map((referral) => (
+              <div key={referral.id} className="rounded-2xl border border-slate-200 p-3 text-sm">
+                <p className="font-semibold text-slate-900">{referral.referral_source ?? 'Referral source pending'}</p>
+                <p className="text-slate-500">{referral.title ?? 'Contract'}</p>
+                <p className="text-xs text-slate-400">
+                  Added {referral.created_at ? toDisplayDate(referral.created_at) : 'recently'}
+                </p>
+              </div>
+            ))}
         </CardContent>
       </Card>
     </div>

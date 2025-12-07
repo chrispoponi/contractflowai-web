@@ -16,7 +16,7 @@ type ParserDiagnostics = {
   deadlineRulesApplied?: boolean
 }
 
-type FieldSource = 'ai' | 'regex' | 'rule'
+type FieldSource = 'ai' | 'regex' | 'rule' | 'manual'
 
 type FieldKey =
   | 'title'
@@ -99,6 +99,7 @@ serve(async (req) => {
     const { contractId, storagePath, userId, persist = true } = body ?? {}
 
     if (!storagePath || !userId) {
+      console.error('[CONTRACT_PARSING_INVALID_BODY]', { storagePath, userId })
       return httpResponse(400, { error: 'storagePath and userId are required' })
     }
 
@@ -163,6 +164,8 @@ serve(async (req) => {
       fieldMeta: meta,
       needsVerification,
       riskItems,
+      risks: riskItems,
+      summary: values.summary,
       diagnostics,
       summaryPath
     })

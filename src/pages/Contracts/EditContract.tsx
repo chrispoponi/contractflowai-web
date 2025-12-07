@@ -63,9 +63,11 @@ type FieldMeta = {
 interface ParserResponse {
   parsedContract: ParsedContract
   riskItems?: RiskItem[]
+  risks?: RiskItem[]
   diagnostics?: ParserDiagnostics
   fieldMeta?: Partial<Record<keyof ParsedContract, FieldMeta>>
   needsVerification?: (keyof ParsedContract)[]
+  summary?: string | null
   summaryPath?: string | null
 }
 
@@ -276,7 +278,7 @@ export default function EditContract() {
       const contractPayload = parserData.parsedContract
 
       setFormData(contractPayload)
-      setRiskItems(parserData.riskItems ?? [])
+      setRiskItems(parserData.risks ?? parserData.riskItems ?? [])
       setDiagnostics(parserData.diagnostics ?? null)
       setFieldMeta(parserData.fieldMeta ?? null)
       const reviewTargets = (parserData.needsVerification ?? []) as (keyof ParsedContract)[]
@@ -294,10 +296,8 @@ export default function EditContract() {
   }
 
   const invokeParser = async (objectPath: string, userId: string): Promise<ParserResponse> => {
-    const tempContractId = crypto.randomUUID()
     const { data, error } = await supabase.functions.invoke<ParserResponse>('contractParsing', {
       body: {
-        contractId: tempContractId,
         storagePath: objectPath,
         userId,
         persist: false
