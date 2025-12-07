@@ -1,9 +1,25 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { Sparkles, Zap, Building2, Users, Check } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuth } from '@/components/providers/AuthProvider'
+
+const budgetButtonId =
+  (import.meta.env.VITE_STRIPE_BUDGET_BUTTON_ID as string | undefined) || 'buy_btn_1SGsHg0ONIDdV6FnDvFyVTX7'
+const professionalButtonId =
+  (import.meta.env.VITE_STRIPE_PRO_BUTTON_ID as string | undefined) || 'buy_btn_1SGPxr0ONIDdV6FnqhxWOEDx'
+const teamButtonId =
+  (import.meta.env.VITE_STRIPE_TEAM_BUTTON_ID as string | undefined) || 'buy_btn_1Saiu70ONIDdV6Fn9jVUKJtD'
+
+const STRIPE_CHECKOUT_LINKS: Record<string, string> = {
+  [budgetButtonId]:
+    (import.meta.env.VITE_STRIPE_BUDGET_LINK as string | undefined) || 'https://buy.stripe.com/bJeeV52Z5f5m3sD6Bnd7q05',
+  [professionalButtonId]:
+    (import.meta.env.VITE_STRIPE_PRO_LINK as string | undefined) || 'https://buy.stripe.com/eVqbIT7fl6yQd3d7Frd7q04',
+  [teamButtonId]:
+    (import.meta.env.VITE_STRIPE_TEAM_LINK as string | undefined) || 'https://buy.stripe.com/bJe3cngPVg9q1kvbVHd7q02'
+}
 
 type Plan = {
   name: string
@@ -39,8 +55,7 @@ const planDefinitions: Plan[] = [
     features: ['2 contracts / month', 'AI analysis', 'Calendar tracking', 'Email reminders', 'Counter offers', 'Mobile optimized'],
     tier: 'budget',
     ctaText: 'Get Started',
-    stripeBuyButtonId:
-      (import.meta.env.VITE_STRIPE_BUDGET_BUTTON_ID as string | undefined) || 'buy_btn_1SGsHg0ONIDdV6FnDvFyVTX7'
+    stripeBuyButtonId: budgetButtonId
   },
   {
     name: 'Professional',
@@ -52,8 +67,7 @@ const planDefinitions: Plan[] = [
     tier: 'professional',
     highlighted: true,
     ctaText: 'Get Started',
-    stripeBuyButtonId:
-      (import.meta.env.VITE_STRIPE_PRO_BUTTON_ID as string | undefined) || 'buy_btn_1SGPxr0ONIDdV6FnqhxWOEDx'
+    stripeBuyButtonId: professionalButtonId
   },
   {
     name: 'Team',
@@ -64,54 +78,28 @@ const planDefinitions: Plan[] = [
     features: ['Unlimited contracts', 'Up to 10 agents', 'Team dashboard', 'Shared calendar', 'Custom checklists', 'Account manager'],
     tier: 'team',
     ctaText: 'Get Started',
-    stripeBuyButtonId:
-      (import.meta.env.VITE_STRIPE_TEAM_BUTTON_ID as string | undefined) || 'buy_btn_1Saiu70ONIDdV6Fn9jVUKJtD'
+    stripeBuyButtonId: teamButtonId
   }
 ]
 
 export default function PricingPage() {
   const navigate = useNavigate()
   const { user, loading } = useAuth()
-  const [stripeLoaded, setStripeLoaded] = useState(false)
-  const publishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? 'pk_test_placeholder'
 
   const plans = useMemo(() => planDefinitions, [])
 
-  useEffect(() => {
-    if (!publishableKey) return
-    if (document.querySelector('script[src="https://js.stripe.com/v3/buy-button.js"]')) {
-      setStripeLoaded(true)
-      return
-    }
-    const script = document.createElement('script')
-    script.src = 'https://js.stripe.com/v3/buy-button.js'
-    script.async = true
-    script.onload = () => setStripeLoaded(true)
-    script.onerror = () => setStripeLoaded(false)
-    document.body.appendChild(script)
-  }, [publishableKey])
-
   const handleTrialStart = () => navigate('/signup')
   const handleSignIn = () => navigate('/login')
+  const handleSubscribe = (buttonId?: string | null) => {
+    if (!buttonId) return
+    const link = STRIPE_CHECKOUT_LINKS[buttonId]
+    if (link) {
+      window.open(link, '_blank', 'noopener,noreferrer')
+    }
+  }
 
   return (
     <div className="min-h-screen bg-white">
-      <style>
-        {`
-          stripe-buy-button {
-            display: flex !important;
-            justify-content: center !important;
-            width: 100% !important;
-          }
-          
-          @media (max-width: 768px) {
-            stripe-buy-button {
-              max-width: 100% !important;
-            }
-          }
-        `}
-      </style>
-
       <nav className="sticky top-0 z-20 border-b bg-white/95 backdrop-blur-sm">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:h-20 sm:px-6 lg:px-8">
           <Link to="/" className="flex items-center gap-2">
@@ -178,7 +166,7 @@ export default function PricingPage() {
                     </div>
                   ))}
                 </div>
-                <div className="mt-6 pt-2">
+                <div className="mt-6 flex flex-col gap-2">
                   {plan.tier === 'trial' ? (
                     <Button
                       onClick={handleTrialStart}
@@ -187,17 +175,21 @@ export default function PricingPage() {
                     >
                       {user?.app_metadata?.subscription_tier === plan.tier ? 'Current Plan' : plan.ctaText}
                     </Button>
-                  ) : plan.stripeBuyButtonId && stripeLoaded && publishableKey ? (
-                    <div className="w-full">
-                      <stripe-buy-button
-                        buy-button-id={plan.stripeBuyButtonId}
-                        publishable-key={publishableKey}
-                      ></stripe-buy-button>
-                    </div>
                   ) : (
-                    <Button disabled className="w-full">
-                      Loading...
+                    <Button
+                      onClick={() => handleSubscribe(plan.stripeBuyButtonId)}
+                      className="w-full bg-[#1e3a5f] text-white hover:bg-[#2d4a6f]"
+                    >
+                      Subscribe
                     </Button>
+                  )}
+                  {plan.tier !== 'trial' && (
+                    <div className="flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.2em] text-slate-400">
+                      <span>Visa</span>
+                      <span>MC</span>
+                      <span>Amex</span>
+                      <span>ACH</span>
+                    </div>
                   )}
                 </div>
               </CardContent>
