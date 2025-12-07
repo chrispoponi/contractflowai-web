@@ -305,7 +305,7 @@ export default function CalendarPage() {
           </Card>
         </div>
 
-        <SendTimelinesDialog
+        <EmailTimelinesDialog
           open={showSendModal}
           onOpenChange={(open) => {
             if (!open) {
@@ -415,6 +415,84 @@ function buildEmailableContracts(contracts: Contract[]) {
     const email = contract.representing_side === 'buyer' ? contract.buyer_email : contract.seller_email
     return Boolean(email)
   })
+}
+
+type EmailDialogProps = {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  contracts: Contract[]
+  selected: Set<string>
+  toggle: (id: string) => void
+  isSending: boolean
+  onSend: () => void
+  sendResults: {
+    success: { name: string; email: string }[]
+    failed: { name: string; email?: string; reason: string }[]
+  } | null
+}
+
+function EmailTimelinesDialog({
+  open,
+  onOpenChange,
+  contracts,
+  selected,
+  toggle,
+  isSending,
+  onSend,
+  sendResults
+}: EmailDialogProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Email client timelines</DialogTitle>
+          <DialogDescription>Select contracts with client email addresses to send an updated timeline.</DialogDescription>
+        </DialogHeader>
+
+        <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+          {contracts.length === 0 && <p className="text-sm text-slate-500">No eligible contracts yet.</p>}
+          {contracts.map((contract) => {
+            const clientEmail =
+              contract.representing_side === 'buyer' ? contract.buyer_email : contract.seller_email ?? undefined
+
+            return (
+              <label
+                key={contract.id}
+                className="flex items-start gap-3 rounded-xl border border-slate-200 p-3 text-sm text-slate-600"
+              >
+                <Checkbox checked={selected.has(contract.id)} onCheckedChange={() => toggle(contract.id)} />
+                <span>
+                  <strong className="block text-slate-900">{contract.property_address ?? contract.title}</strong>
+                  {clientEmail ? (
+                    <span className="text-xs text-slate-500">{clientEmail}</span>
+                  ) : (
+                    <span className="text-xs text-amber-600">No client email</span>
+                  )}
+                </span>
+              </label>
+            )
+          })}
+        </div>
+
+        {sendResults && (
+          <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
+            {sendResults.success.length > 0 && (
+              <p className="text-emerald-600">Sent {sendResults.success.length} timeline(s) successfully.</p>
+            )}
+            {sendResults.failed.length > 0 && (
+              <p className="text-rose-600">
+                {sendResults.failed.length} timeline(s) failed. Please confirm the client emails and try again.
+              </p>
+            )}
+          </div>
+        )}
+
+        <Button onClick={onSend} disabled={selected.size === 0 || isSending} className="w-full">
+          {isSending ? 'Sending...' : selected.size > 0 ? `Send ${selected.size} timeline(s)` : 'Select contracts'}
+        </Button>
+      </DialogContent>
+    </Dialog>
+  )
 }
 
 function CalendarGrid({
