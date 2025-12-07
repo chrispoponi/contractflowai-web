@@ -19,6 +19,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useToast } from '@/components/ui/use-toast'
+import { Checkbox } from '@/components/ui/checkbox'
 
 type ParsedContract = {
   title: string | null
@@ -77,6 +78,15 @@ const toNumber = (value: string | null) => {
   return normalized ? Number(normalized) : null
 }
 
+const CRITICAL_DATES: { key: keyof ParsedContract; label: string }[] = [
+  { key: 'closing_date', label: 'Closing date' },
+  { key: 'inspection_date', label: 'Inspection deadline' },
+  { key: 'inspection_response_date', label: 'Inspection response' },
+  { key: 'loan_contingency_date', label: 'Financing contingency' },
+  { key: 'appraisal_date', label: 'Appraisal contingency' },
+  { key: 'final_walkthrough_date', label: 'Final walkthrough' }
+]
+
 export default function EditContract() {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -92,6 +102,7 @@ export default function EditContract() {
   const [isParsing, setIsParsing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [reviewOpen, setReviewOpen] = useState(false)
+  const [datesConfirmed, setDatesConfirmed] = useState(false)
 
   const resetState = () => {
     setFile(null)
@@ -100,6 +111,7 @@ export default function EditContract() {
     setRiskItems([])
     setDiagnostics(null)
     setStatusMessage('')
+    setDatesConfirmed(false)
   }
 
   const handleFieldChange = (field: keyof ParsedContract, value: string) => {
@@ -164,6 +176,7 @@ export default function EditContract() {
       setDiagnostics(parserData.diagnostics ?? null)
       setReviewOpen(true)
       setStatusMessage('Parsed successfully. Review & confirm.')
+      setDatesConfirmed(false)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to parse contract.'
       toast({ title: 'Parsing failed', description: message, variant: 'destructive' })
@@ -242,6 +255,7 @@ export default function EditContract() {
 
       resetState()
       setReviewOpen(false)
+      setDatesConfirmed(false)
       navigate(`/contracts/${data.id}`)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to save contract.'
@@ -344,6 +358,19 @@ export default function EditContract() {
 
           {formData && (
             <div className="space-y-6">
+              {(() => {
+                const unclearDates = CRITICAL_DATES.filter(({ key }) => !formData[key])
+                if (unclearDates.length === 0) return null
+                return (
+                  <Alert variant="destructive">
+                    <AlertDescription>
+                      We could not confidently extract:{' '}
+                      {unclearDates.map((date) => date.label).join(', ')}. Please verify these dates before saving.
+                    </AlertDescription>
+                  </Alert>
+                )
+              })()}
+
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <Label htmlFor="title">Title</Label>
@@ -483,6 +510,18 @@ export default function EditContract() {
                   </div>
                 </div>
               )}
+
+              <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                <Checkbox
+                  id="confirm-dates"
+                  checked={datesConfirmed}
+                  onCheckedChange={(checked) => setDatesConfirmed(Boolean(checked))}
+                  className="mt-1"
+                />
+                <label htmlFor="confirm-dates" className="cursor-pointer">
+                  I reviewed every deadline above and confirm they are accurate before adding this contract to my calendar.
+                </label>
+              </div>
             </div>
           )}
 
@@ -490,7 +529,7 @@ export default function EditContract() {
             <Button variant="outline" onClick={() => setReviewOpen(false)}>
               Back
             </Button>
-            <Button onClick={handleConfirm} disabled={isSaving}>
+            <Button onClick={handleConfirm} disabled={isSaving || !datesConfirmed}>
               {isSaving ? 'Saving…' : 'Save contract'}
             </Button>
           </DialogFooter>
