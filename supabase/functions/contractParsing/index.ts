@@ -79,10 +79,8 @@ const VERIFICATION_THRESHOLD = 0.65
 const MAX_WARNINGS = 2
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://contractflowai.us',
-  'Access-Control-Allow-Headers':
-    'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS'
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'content-type'
 }
 
 // -----------------------------------------------------------------------------
@@ -91,19 +89,19 @@ const corsHeaders = {
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', {
+      headers: { ...corsHeaders, 'Access-Control-Allow-Methods': 'POST, OPTIONS' }
+    })
   }
 
   try {
     const body = await req.json()
-    const { contractId, storagePath, userId, persist = true } = body ?? {}
+    const { storagePath, userId, contractId, persist = true } = body ?? {}
 
     if (!storagePath || !userId) {
       console.error('[CONTRACT_PARSING_INVALID_BODY]', { storagePath, userId })
       return httpResponse(400, { error: 'storagePath and userId are required' })
     }
-
-    const targetContractId = contractId ?? crypto.randomUUID()
 
     const { fileBytes, mimeType } = await downloadFromStorage(storagePath)
     const textContent = await extractPlainText(fileBytes, mimeType).catch(() => null)
@@ -128,7 +126,7 @@ serve(async (req) => {
       diagnostics.usedFallback = true
       diagnostics.primaryError = error instanceof Error ? error.message : String(error)
       console.error('[PRIMARY_PARSER_FAILED]', {
-        contractId: targetContractId,
+        storagePath,
         error: diagnostics.primaryError
       })
 
@@ -151,9 +149,7 @@ serve(async (req) => {
 
     const { values, meta, needsVerification } = finalizeFieldState(fieldState)
 
-    const summaryPath = contractId
-      ? await persistSummary(contractId, values, riskItems, diagnostics)
-      : null
+    const summaryPath = await persistSummary(storagePath, values, riskItems, diagnostics)
 
     if (persist && contractId) {
       await updateContractRecord(contractId, userId, values, summaryPath)
@@ -594,7 +590,7 @@ async function ensureImages(fileBytes: Uint8Array) {
 // -----------------------------------------------------------------------------
 
 async function persistSummary(
-  contractId: string,
+  storagePath: string,
   values: Record<FieldKey, string | null>,
   riskItems: RiskItem[],
   diagnostics: ParserDiagnostics
@@ -606,7 +602,11 @@ async function persistSummary(
     diagnostics
   }
 
-  const summaryKey = `${SUMMARY_FOLDER}/${contractId}/summary.json`
+  const safeKey = storagePath
+    .replace(/[^a-zA-Z0-9/_-]/g, '-')
+    .replace(/\/{2,}/g, '/')
+    .replace(/^-+|-+$/g, '')
+  const summaryKey = `${SUMMARY_FOLDER}/${safeKey || crypto.randomUUID()}/summary.json`
   const { error } = await supabase.storage
     .from(CONTRACTS_BUCKET)
     .upload(summaryKey, new Blob([JSON.stringify(summaryPayload)], { type: 'application/json' }), {
@@ -682,6 +682,6 @@ function formatDate(date: Date) {
 function httpResponse(status: number, payload: Record<string, unknown>) {
   return new Response(JSON.stringify(payload), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    headers: { ...corsHeaders, 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Content-Type': 'application/json' }
   })
 }
