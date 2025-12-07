@@ -83,11 +83,30 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'content-type'
 }
 
+async function logError(userId: string | null, message: string, payload?: Record<string, unknown>) {
+  try {
+    await supabase.from('feedback').insert({
+      user_id: userId,
+      topic: 'contract_parsing_error',
+      sentiment: 'negative',
+      message: null,
+      error_message: message,
+      raw_payload: payload ? JSON.stringify(payload).slice(0, 8000) : null,
+      created_at: new Date().toISOString()
+    })
+  } catch (loggingError) {
+    console.error('[CONTRACT_PARSING_LOG_ERROR_FAILED]', loggingError)
+  }
+}
+
 // -----------------------------------------------------------------------------
 // HTTP Handler
 // -----------------------------------------------------------------------------
 
 serve(async (req) => {
+  let currentUserId: string | null = null
+  let currentStoragePath: string | null = null
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', {
       headers: { ...corsHeaders, 'Access-Control-Allow-Methods': 'POST, OPTIONS' }
@@ -102,6 +121,9 @@ serve(async (req) => {
       console.error('[CONTRACT_PARSING_INVALID_BODY]', { storagePath, userId })
       return httpResponse(400, { error: 'storagePath and userId are required' })
     }
+
+    currentUserId = userId
+    currentStoragePath = storagePath
 
     const { fileBytes, mimeType } = await downloadFromStorage(storagePath)
     const textContent = await extractPlainText(fileBytes, mimeType).catch(() => null)
@@ -167,7 +189,9 @@ serve(async (req) => {
     })
   } catch (error) {
     console.error('[CONTRACT_PARSING_ERROR]', error)
-    return httpResponse(500, { error: error instanceof Error ? error.message : String(error) })
+    const message = error instanceof Error ? error.message : String(error)
+    await logError(currentUserId, message, { storagePath: currentStoragePath })
+    return httpResponse(500, { error: message })
   }
 })
 

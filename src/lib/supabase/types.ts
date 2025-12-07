@@ -151,7 +151,9 @@ export type Database = {
           email: string | null
           topic: string | null
           sentiment: string | null
-          message: string
+          message: string | null
+          error_message: string | null
+          raw_payload: string | null
           created_at: string
         }
         Insert: {
@@ -160,7 +162,9 @@ export type Database = {
           email?: string | null
           topic?: string | null
           sentiment?: string | null
-          message: string
+          message?: string | null
+          error_message?: string | null
+          raw_payload?: string | null
           created_at?: string
         }
         Update: Partial<Database['public']['Tables']['feedback']['Row']>

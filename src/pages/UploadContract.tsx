@@ -24,6 +24,8 @@ export default function UploadContract() {
   const [file, setFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [statusTrail, setStatusTrail] = useState<string[]>([])
+  const [uiError, setUiError] = useState<string | null>(null)
+  const [uiSuccess, setUiSuccess] = useState<string | null>(null)
 
   const updateStatus = (status: string) => {
     setStatusTrail((prev) => [...prev, `${new Date().toLocaleTimeString()} — ${status}`])
@@ -47,6 +49,8 @@ export default function UploadContract() {
 
     setIsUploading(true)
     setStatusTrail([])
+    setUiError(null)
+    setUiSuccess(null)
     const timestamp = Date.now()
     const sanitized = sanitizeFileName(file.name || 'contract.pdf')
     const storagePath = `${user.id}/${timestamp}-${sanitized}`
@@ -76,18 +80,41 @@ export default function UploadContract() {
       if (insertError || !contract) throw insertError ?? new Error('Unable to create contract')
 
       updateStatus('Parsing contract with AI…')
-      const { error: parsingError } = await supabase.functions.invoke('contractParsing', {
-        body: {
-          storagePath,
-          userId: user.id,
-          contractId: contract.id,
-          persist: true
-        }
-      })
+      let parsingFailed = false
+      try {
+        const { error: parsingError } = await supabase.functions.invoke('contractParsing', {
+          body: {
+            storagePath,
+            userId: user.id,
+            contractId: contract.id,
+            persist: true
+          }
+        })
 
-      if (parsingError) {
-        await supabase.from('contracts').update({ status: 'parsed_fallback' }).eq('id', contract.id).eq('user_id', user.id)
-        throw parsingError
+        if (parsingError) {
+          console.error('Edge Function Error:', parsingError)
+          setUiError('We could not parse your contract. Our team was notified.')
+          toast({ title: 'Parsing failed', description: 'Our team was notified to review this upload.', variant: 'destructive' })
+          parsingFailed = true
+        } else {
+          setUiSuccess('Contract uploaded and parsing started!')
+          toast({ title: 'Contract uploaded', description: 'Parsing complete. Review the details now.' })
+        }
+      } catch (invokeError) {
+        console.error('Unexpected error:', invokeError)
+        setUiError('Unexpected failure. Please try again.')
+        toast({ title: 'Unexpected error', description: 'Please re-upload the contract.', variant: 'destructive' })
+        parsingFailed = true
+      }
+
+      if (parsingFailed) {
+        await supabase
+          .from('contracts')
+          .update({ status: 'parsed_fallback' })
+          .eq('id', contract.id)
+          .eq('user_id', user.id)
+        updateStatus('Parsing failed. Please try again or contact support.')
+        return
       }
 
       updateStatus('Finalizing contract…')
@@ -97,12 +124,13 @@ export default function UploadContract() {
         .eq('id', contract.id)
         .eq('user_id', user.id)
 
-      toast({ title: 'Contract parsed', description: 'Review the extracted data now.' })
+      updateStatus('Completed!')
       navigate(`/contracts/${contract.id}`)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unexpected error'
       console.error('[UploadContract]', message)
       toast({ title: 'Upload failed', description: message, variant: 'destructive' })
+      setUiError('Unable to upload contract. Please try again.')
       updateStatus(`Error: ${message}`)
     } finally {
       setIsUploading(false)
@@ -153,6 +181,16 @@ export default function UploadContract() {
               <p key={status}>{status}</p>
             ))}
           </AlertDescription>
+        </Alert>
+      )}
+      {uiSuccess && (
+        <Alert>
+          <AlertDescription className="text-sm text-emerald-700">{uiSuccess}</AlertDescription>
+        </Alert>
+      )}
+      {uiError && (
+        <Alert>
+          <AlertDescription className="text-sm text-red-600">{uiError}</AlertDescription>
         </Alert>
       )}
     </div>
