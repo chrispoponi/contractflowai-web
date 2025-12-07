@@ -8,6 +8,9 @@ const supabase = createClient<Database>(
   { auth: { persistSession: false } }
 )
 
+const CONTRACTS_BUCKET = Deno.env.get('CONTRACTS_BUCKET') ?? 'contracts'
+const SUMMARY_FOLDER = Deno.env.get('SUMMARY_FOLDER') ?? 'summaries'
+
 serve(async (req) => {
   try {
     const { contractId, storagePath, userId } = await req.json()
@@ -20,13 +23,18 @@ serve(async (req) => {
       generated_at: new Date().toISOString()
     }
 
-    const summaryPath = `${contractId}/summary.json`
+    const summaryPath = `${SUMMARY_FOLDER}/${contractId}/summary.json`
 
-    await supabase.storage
-      .from('summaries')
+    const { error: summaryUploadError } = await supabase.storage
+      .from(CONTRACTS_BUCKET)
       .upload(summaryPath, new Blob([JSON.stringify(summaryPayload)], { type: 'application/json' }), {
-        upsert: true
+        upsert: true,
+        cacheControl: '3600'
       })
+
+    if (summaryUploadError) {
+      throw summaryUploadError
+    }
 
     const { error } = await supabase
       .from('contracts')
@@ -40,7 +48,7 @@ serve(async (req) => {
 
     if (error) throw error
 
-    return new Response(JSON.stringify({ success: true, summary: aiSummary }), {
+    return new Response(JSON.stringify({ success: true, summary: aiSummary, summaryPath }), {
       headers: { 'Content-Type': 'application/json' }
     })
   } catch (error) {
