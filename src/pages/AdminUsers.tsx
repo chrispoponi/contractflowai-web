@@ -26,11 +26,19 @@ interface AdminFunctionResponse {
   link?: string | null
 }
 
+const ADMIN_EMAILS = (import.meta.env.VITE_ADMIN_EMAILS ?? 'chrispoponi@gmail.com')
+  .split(',')
+  .map((email) => email.trim().toLowerCase())
+  .filter(Boolean)
+
 export default function AdminUsers() {
   const { user } = useAuth()
   const { toast } = useToast()
   const queryClient = useQueryClient()
-  const isAdmin = useMemo(() => user?.app_metadata?.role === 'admin', [user])
+  const isAdmin = useMemo(() => {
+    if (!user?.email) return user?.app_metadata?.role === 'admin'
+    return user.app_metadata?.role === 'admin' || ADMIN_EMAILS.includes(user.email.toLowerCase())
+  }, [user])
 
   const [newUser, setNewUser] = useState({ email: '', password: '', fullName: '' })
 

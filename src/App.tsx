@@ -30,6 +30,8 @@ import NotFound from '@/pages/NotFound'
 import './App.css'
 import { usePostLoginRedirect } from '@/hooks/usePostLoginRedirect'
 
+const ENABLE_CLIENT_UPDATES = (import.meta.env.VITE_ENABLE_CLIENT_UPDATES ?? 'false') === 'true'
+
 function App() {
   usePostLoginRedirect()
 
@@ -60,7 +62,7 @@ function App() {
           <Route path="/settings/brokerage" element={<BrokerageSettings />} />
           <Route path="/teams" element={<TeamManagement />} />
           <Route path="/debug/reminders" element={<DebugReminders />} />
-          <Route path="/client-updates" element={<ClientUpdates />} />
+          {ENABLE_CLIENT_UPDATES && <Route path="/client-updates" element={<ClientUpdates />} />}
           <Route path="/referrals" element={<Referrals />} />
           <Route path="/organizations" element={<Organizations />} />
           <Route path="/profile" element={<Profile />} />

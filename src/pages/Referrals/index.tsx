@@ -83,7 +83,7 @@ export default function Referrals() {
             referrals.map((referral) => (
               <div key={referral.id} className="rounded-2xl border border-slate-200 p-3 text-sm">
                 <p className="font-semibold text-slate-900">{referral.referral_source ?? 'Referral source pending'}</p>
-                <p className="text-slate-500">{referral.title ?? 'Contract'}</p>
+                <p className="text-slate-500">{referral.property_address ?? 'Contract'}</p>
                 <p className="text-xs text-slate-400">
                   Added {referral.created_at ? toDisplayDate(referral.created_at) : 'recently'}
                 </p>

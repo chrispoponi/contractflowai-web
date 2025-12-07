@@ -31,6 +31,8 @@ import {
 } from '@/components/ui/sidebar'
 import { useAuth } from '@/components/providers/AuthProvider'
 
+const ENABLE_CLIENT_UPDATES = (import.meta.env.VITE_ENABLE_CLIENT_UPDATES ?? 'false') === 'true'
+
 const navigationItems = [
   {
     title: 'Dashboard',
@@ -55,11 +57,15 @@ const navigationItems = [
 ]
 
 const toolsItems = [
-  {
-    title: 'Client Updates',
-    url: '/client-updates',
-    icon: Send
-  },
+  ...(ENABLE_CLIENT_UPDATES
+    ? [
+        {
+          title: 'Client Updates',
+          url: '/client-updates',
+          icon: Send
+        }
+      ]
+    : []),
   {
     title: 'Referrals',
     url: '/referrals',
@@ -100,6 +106,11 @@ const managementItems = [
   }
 ]
 
+const ADMIN_EMAILS = (import.meta.env.VITE_ADMIN_EMAILS ?? 'chrispoponi@gmail.com')
+  .split(',')
+  .map((email) => email.trim().toLowerCase())
+  .filter(Boolean)
+
 const adminItems = [
   {
     title: 'Admin Users',
@@ -111,7 +122,8 @@ const adminItems = [
 export default function Layout() {
   const location = useLocation()
   const { user, signOut } = useAuth()
-  const isAdmin = user?.app_metadata?.role === 'admin'
+  const isAdmin =
+    user?.app_metadata?.role === 'admin' || (user?.email ? ADMIN_EMAILS.includes(user.email.toLowerCase()) : false)
 
   const initials = useMemo(() => {
     if (!user?.user_metadata?.full_name) return user?.email?.[0]?.toUpperCase() ?? 'U'

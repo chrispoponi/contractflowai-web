@@ -67,16 +67,10 @@ export default function TeamManagement() {
           <Card key={team.id}>
             <CardHeader>
               <CardTitle>{team.name}</CardTitle>
-              <p className="text-sm text-slate-500">{team.team_members?.length ?? 0} members</p>
+              <p className="text-sm text-slate-500">Team ID: {team.id}</p>
             </CardHeader>
             <CardContent className="space-y-2">
-              {(Array.isArray(team.team_members) ? team.team_members : []).map((member) => (
-                <div key={member.id} className="rounded-xl border border-slate-200 p-3 text-sm">
-                  <p className="font-medium text-slate-900">{member.user_id}</p>
-                  <p className="text-slate-500">Role: {member.role ?? 'Member'}</p>
-                </div>
-              ))}
-              {(team.team_members?.length ?? 0) === 0 && <p className="text-sm text-slate-500">No members yet.</p>}
+              <p className="text-sm text-slate-500">Members are managed in Supabase until relations are configured.</p>
             </CardContent>
           </Card>
         ))}

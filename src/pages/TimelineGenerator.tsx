@@ -20,10 +20,10 @@ export default function TimelineGenerator() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('contracts')
-        .select('id, title')
+        .select('id, property_address')
         .eq('user_id', user!.id)
       if (error) throw error
-      return data as Pick<Tables<'contracts'>, 'id' | 'title'>[]
+      return data as Pick<Tables<'contracts'>, 'id' | 'property_address'>[]
     }
   })
 
@@ -63,7 +63,7 @@ export default function TimelineGenerator() {
             <SelectContent>
               {contracts.map((contract) => (
                 <SelectItem key={contract.id} value={contract.id}>
-                  {contract.title}
+                  {contract.property_address ?? 'Contract'}
                 </SelectItem>
               ))}
             </SelectContent>

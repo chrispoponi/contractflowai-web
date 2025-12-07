@@ -2,18 +2,16 @@ import { supabase } from '../client'
 
 type ReferralRow = {
   id: string
-  title: string | null
+  property_address: string | null
   referral_source?: string | null
   agent_notes?: string | null
-  property_address?: string | null
   created_at: string | null
 }
 
-const REFERRAL_COLUMNS = 'id, title, referral_source, created_at'
+const REFERRAL_COLUMNS = 'id, property_address, referral_source, created_at'
 
 export const ReferralsAPI = {
-  list: (userId: string) =>
-    supabase.from('contracts').select(REFERRAL_COLUMNS).eq('user_id', userId).not('referral_source', 'is', null),
+  list: (userId: string) => supabase.from('contracts').select(REFERRAL_COLUMNS).eq('user_id', userId),
   attach: (contractId: string, payload: Record<string, unknown>) => supabase.from('contracts').update(payload).eq('id', contractId)
 }
 
@@ -33,13 +31,14 @@ export const listReferrals = async (userId: string) => {
 
     return (fallbackData ?? []).map((row) => ({
       id: row.id,
-      title: row.property_address ?? 'Contract',
+      property_address: row.property_address ?? 'Contract',
       referral_source: row.agent_notes,
       created_at: row.created_at
     }))
   }
 
-  return Array.isArray(data) ? data : []
+  const rows = Array.isArray(data) ? data : []
+  return rows.filter((row) => row.referral_source ?? row.agent_notes)
 }
 
 export const attachReferral = async (contractId: string, payload: Record<string, unknown>) => {
