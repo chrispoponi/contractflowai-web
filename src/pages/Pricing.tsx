@@ -167,6 +167,11 @@ export default function PricingPage() {
                   ))}
                 </div>
                 <div className="mt-6 flex flex-col gap-2">
+                  {plan.tier === 'professional' && (
+                    <p className="text-center text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">
+                      Includes 15 contracts / month
+                    </p>
+                  )}
                   {plan.tier === 'trial' ? (
                     <Button
                       onClick={handleTrialStart}
