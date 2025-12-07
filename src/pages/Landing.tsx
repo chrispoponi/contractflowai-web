@@ -90,18 +90,25 @@ export default function Landing() {
               </Button>
             </div>
             <div className="grid gap-4 rounded-2xl border border-slate-100 bg-white/70 p-5 shadow-sm backdrop-blur">
-              <div className="flex items-center justify-between text-sm text-slate-600">
-                <span>Agents onboarded</span>
-                <strong className="text-lg text-slate-900">320+</strong>
-              </div>
-              <div className="flex items-center justify-between text-sm text-slate-600">
-                <span>Deadlines tracked automatically</span>
-                <strong className="text-lg text-slate-900">12,400+</strong>
-              </div>
-              <div className="flex items-center justify-between text-sm text-slate-600">
-                <span>Time saved per contract</span>
-                <strong className="text-lg text-emerald-600">4.5 hrs avg</strong>
-              </div>
+              {[
+                {
+                  title: 'Hands-off timeline extraction',
+                  desc: 'Every inspection, appraisal, contingency, and closing date pulled instantly from your PDF.'
+                },
+                {
+                  title: 'Calendar + mobile sync',
+                  desc: 'One click pushes deadlines to Google/Apple Calendar and keeps your phone reminders honest.'
+                },
+                {
+                  title: 'Clients kept in the loop',
+                  desc: 'Automatic branded timelines and reminder emails so you look proactive without extra work.'
+                }
+              ].map((item) => (
+                <div key={item.title} className="text-left text-sm text-slate-600">
+                  <p className="font-semibold text-slate-900">{item.title}</p>
+                  <p className="text-slate-500">{item.desc}</p>
+                </div>
+              ))}
             </div>
           </div>
           <div className="relative">
@@ -214,20 +221,26 @@ export default function Landing() {
       </section>
 
       <section className="py-16 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-blue-50 to-indigo-50">
-        <div className="max-w-4xl mx-auto text-center">
-          <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8 border-2 border-blue-100">
-            <div className="mb-4">
-              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-[#c9a961] to-[#b8935a] rounded-full mx-auto flex items-center justify-center">
-                <span className="text-white font-bold text-lg sm:text-2xl">JP</span>
-              </div>
-            </div>
-            <p className="text-base sm:text-lg text-gray-700 italic mb-4 sm:mb-6 leading-relaxed">
-              "As a licensed agent, I've used countless tools to manage my transactions. ContractFlowAI is the only one that actually keeps me organized without the headache. No more missed deadlines, no more scattered notes. Everything I need in one place."
+        <div className="max-w-4xl mx-auto">
+          <div className="rounded-2xl border-2 border-blue-100 bg-white p-8 shadow-lg">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Built with agents</p>
+            <p className="mt-4 text-lg text-slate-600">
+              ContractFlowAI is made by a practicing agent who was tired of spreadsheets, sticky notes, and calendar chaos. The product is intentionally simple:
             </p>
-            <div className="border-t border-gray-200 pt-4">
-              <p className="font-semibold text-gray-900 text-sm sm:text-base">Jackie Poponi</p>
-              <p className="text-xs sm:text-sm text-gray-600">Licensed Real Estate Agent</p>
-            </div>
+            <ul className="mt-6 space-y-3 text-slate-700">
+              <li className="flex gap-2">
+                <CheckCircle className="mt-1 h-4 w-4 text-emerald-500" />
+                <span>Upload any contract; AI reads it like a seasoned TC.</span>
+              </li>
+              <li className="flex gap-2">
+                <CheckCircle className="mt-1 h-4 w-4 text-emerald-500" />
+                <span>Share polished timelines with clients and partners in one click.</span>
+              </li>
+              <li className="flex gap-2">
+                <CheckCircle className="mt-1 h-4 w-4 text-emerald-500" />
+                <span>Automate reminders so you can focus on negotiations, not due dates.</span>
+              </li>
+            </ul>
           </div>
         </div>
       </section>
