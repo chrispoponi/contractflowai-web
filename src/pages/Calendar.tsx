@@ -230,8 +230,6 @@ export default function CalendarPage() {
           </div>
         </header>
 
-        <ColorLegend />
-
         <div className="grid gap-6 lg:grid-cols-3">
           <Card className="lg:col-span-2 shadow-lg">
             <CardHeader className="border-b">
