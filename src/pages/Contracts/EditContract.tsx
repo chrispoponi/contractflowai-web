@@ -55,26 +55,41 @@ export default function EditContract() {
   const [formData, setFormData] = useState<ParsedContract | null>(null)
   const [riskItems, setRiskItems] = useState<RiskItem[]>([])
   const [file, setFile] = useState<File | null>(null)
-  const [tempUploadPath, setTempUploadPath] = useState<string | null>(null)
+  const [storagePath, setStoragePath] = useState<string | null>(null)
+  const [statusMessage, setStatusMessage] = useState<string>('')
 
   const handleFieldChange = (field: keyof ParsedContract, value: string) => {
     setFormData((prev) => ({ ...(prev ?? {}), [field]: value }))
   }
 
+  const sanitizeFileName = (name: string) =>
+    name
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9.-]/g, '')
+
   const handleFileSelection = async (selectedFile: File | null) => {
     if (!user || !selectedFile) return
     setFile(selectedFile)
     setIsParsing(true)
+    setStatusMessage('Uploading contract…')
+    setStoragePath(null)
 
     try {
-      const tempPath = `${user.id}/uploads/${Date.now()}-${selectedFile.name}`
-      const { error: uploadError } = await supabase.storage.from('uploads').upload(tempPath, selectedFile, { upsert: true })
+      const safeName = sanitizeFileName(selectedFile.name || 'contract.pdf')
+      const objectPath = `${user.id}/ingest/${Date.now()}-${safeName}`
+      const { error: uploadError } = await supabase.storage.from('contracts').upload(objectPath, selectedFile, {
+        upsert: true,
+        cacheControl: '3600',
+        contentType: selectedFile.type || 'application/pdf'
+      })
       if (uploadError) throw uploadError
-      setTempUploadPath(tempPath)
+      setStoragePath(objectPath)
 
+      setStatusMessage('Parsing contract with AI…')
       const { data, error } = await supabase.functions.invoke('contractParsing', {
         body: {
-          storagePath: tempPath,
+          storagePath: objectPath,
           userId: user.id
         }
       })
@@ -101,26 +116,23 @@ export default function EditContract() {
       })
       setRiskItems(parsed.risk_items ?? parsed.risks ?? [])
       setReviewOpen(true)
+      setStatusMessage('Parsed successfully. Review the details.')
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to parse contract'
       toast({ title: 'Parsing failed', description: message, variant: 'destructive' })
       setFile(null)
+      setStoragePath(null)
+      setStatusMessage('')
     } finally {
       setIsParsing(false)
     }
   }
 
   const handleConfirm = async () => {
-    if (!user || !file || !formData) return
+    if (!user || !file || !formData || !storagePath) return
     setIsSaving(true)
+    setStatusMessage('Saving contract to Supabase…')
     try {
-      const storagePath = `${user.id}/contracts/${Date.now()}-${file.name}`
-      const { error: uploadError } = await supabase.storage.from('contracts').upload(storagePath, file, {
-        cacheControl: '3600',
-        upsert: true
-      })
-      if (uploadError) throw uploadError
-
       const payload: TablesInsert<'contracts'> = {
         user_id: user.id,
         title: formData.title || file.name,
@@ -155,14 +167,13 @@ export default function EditContract() {
       setFormData(null)
       setFile(null)
       setRiskItems([])
-      if (tempUploadPath) {
-        void supabase.storage.from('uploads').remove([tempUploadPath])
-        setTempUploadPath(null)
-      }
+      setStoragePath(null)
+      setStatusMessage('Success! Contract has been added.')
       navigate(`/contracts/${newContract.id}`)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to save contract'
       toast({ title: 'Save failed', description: message, variant: 'destructive' })
+      setStatusMessage('')
     } finally {
       setIsSaving(false)
     }
