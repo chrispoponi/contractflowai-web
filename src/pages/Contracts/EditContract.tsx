@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/components/providers/AuthProvider'
 import { supabase } from '@/lib/supabase/client'
@@ -30,6 +30,8 @@ type ParsedContract = {
   seller_name: string | null
   seller_email: string | null
   purchase_price: string | null
+  earnest_money: string | null
+  contract_date: string | null
   closing_date: string | null
   inspection_date: string | null
   inspection_response_date: string | null
@@ -45,12 +47,25 @@ type ParserDiagnostics = {
   parser: 'primary' | 'vision-fallback'
   usedFallback: boolean
   primaryError?: string | null
+  regexApplied?: boolean
+  deadlineRulesApplied?: boolean
 } | null
+
+type FieldSource = 'ai' | 'regex' | 'rule' | 'manual'
+
+type FieldMeta = {
+  source: FieldSource
+  confidence: number
+  needsVerification: boolean
+  reason?: string
+}
 
 interface ParserResponse {
   parsedContract: ParsedContract
   riskItems?: RiskItem[]
   diagnostics?: ParserDiagnostics
+  fieldMeta?: Partial<Record<keyof ParsedContract, FieldMeta>>
+  needsVerification?: (keyof ParsedContract)[]
   summaryPath?: string | null
 }
 
@@ -78,14 +93,32 @@ const toNumber = (value: string | null) => {
   return normalized ? Number(normalized) : null
 }
 
-const CRITICAL_DATES: { key: keyof ParsedContract; label: string }[] = [
-  { key: 'closing_date', label: 'Closing date' },
-  { key: 'inspection_date', label: 'Inspection deadline' },
-  { key: 'inspection_response_date', label: 'Inspection response' },
-  { key: 'loan_contingency_date', label: 'Financing contingency' },
-  { key: 'appraisal_date', label: 'Appraisal contingency' },
-  { key: 'final_walkthrough_date', label: 'Final walkthrough' }
-]
+const FIELD_LABELS: Record<keyof ParsedContract, string> = {
+  title: 'Title',
+  property_address: 'Property address',
+  client_name: 'Client name',
+  buyer_name: 'Buyer name',
+  buyer_email: 'Buyer email',
+  seller_name: 'Seller name',
+  seller_email: 'Seller email',
+  purchase_price: 'Purchase price',
+  earnest_money: 'Earnest money',
+  contract_date: 'Contract date',
+  closing_date: 'Closing date',
+  inspection_date: 'Inspection deadline',
+  inspection_response_date: 'Inspection response',
+  loan_contingency_date: 'Financing contingency',
+  appraisal_date: 'Appraisal contingency',
+  final_walkthrough_date: 'Final walkthrough',
+  summary: 'Executive summary'
+}
+
+const SOURCE_DESCRIPTION: Record<FieldSource, string> = {
+  ai: 'AI parsed',
+  regex: 'Clause detected',
+  rule: 'Timeline rule',
+  manual: 'Manual edit'
+}
 
 export default function EditContract() {
   const { user } = useAuth()
@@ -98,11 +131,14 @@ export default function EditContract() {
   const [formData, setFormData] = useState<ParsedContract | null>(null)
   const [riskItems, setRiskItems] = useState<RiskItem[]>([])
   const [diagnostics, setDiagnostics] = useState<ParserDiagnostics>(null)
+  const [fieldMeta, setFieldMeta] = useState<Partial<Record<keyof ParsedContract, FieldMeta>> | null>(null)
+  const [fieldsNeedingReview, setFieldsNeedingReview] = useState<(keyof ParsedContract)[]>([])
   const [statusMessage, setStatusMessage] = useState<string>('')
   const [isParsing, setIsParsing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [reviewOpen, setReviewOpen] = useState(false)
   const [datesConfirmed, setDatesConfirmed] = useState(false)
+  const [isGeneratingLink, setIsGeneratingLink] = useState(false)
 
   const resetState = () => {
     setFile(null)
@@ -110,8 +146,60 @@ export default function EditContract() {
     setFormData(null)
     setRiskItems([])
     setDiagnostics(null)
+    setFieldMeta(null)
+    setFieldsNeedingReview([])
     setStatusMessage('')
     setDatesConfirmed(false)
+    setIsGeneratingLink(false)
+  }
+
+  const requiresManualReview = fieldsNeedingReview.length > 0
+
+  useEffect(() => {
+    if (fieldsNeedingReview.length === 0) {
+      setDatesConfirmed(true)
+    }
+  }, [fieldsNeedingReview])
+
+  const renderSourceBadge = (field: keyof ParsedContract) => {
+    const metaInfo = fieldMeta?.[field]
+    if (!metaInfo) return null
+    const badgeClass = metaInfo.needsVerification
+      ? 'bg-amber-100 text-amber-800 border border-amber-200'
+      : 'bg-slate-100 text-slate-600 border border-slate-200'
+    return (
+      <span className={`ml-2 rounded-full px-2 py-0.5 text-[11px] font-medium ${badgeClass}`}>
+        {SOURCE_DESCRIPTION[metaInfo.source]}
+      </span>
+    )
+  }
+
+  const renderFieldHint = (field: keyof ParsedContract) => {
+    const metaInfo = fieldMeta?.[field]
+    if (!metaInfo?.reason) return null
+    return (
+      <p className={`mt-1 text-xs ${metaInfo.needsVerification ? 'text-amber-700' : 'text-slate-500'}`}>
+        {metaInfo.reason}
+        {metaInfo.needsVerification ? ' — please verify.' : ''}
+      </p>
+    )
+  }
+
+  const handleDownloadOriginal = async () => {
+    if (!storagePath) return
+    try {
+      setIsGeneratingLink(true)
+      const { data, error } = await supabase.storage.from(CONTRACTS_BUCKET).createSignedUrl(storagePath, 300)
+      if (error || !data?.signedUrl) {
+        throw error ?? new Error('Missing signed URL')
+      }
+      window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to create download link.'
+      toast({ title: 'Download failed', description: message, variant: 'destructive' })
+    } finally {
+      setIsGeneratingLink(false)
+    }
   }
 
   const handleFieldChange = (field: keyof ParsedContract, value: string) => {
@@ -119,6 +207,21 @@ export default function EditContract() {
       ...(prev ?? {}),
       [field]: value
     }))
+
+    setFieldMeta((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        [field]: {
+          source: 'manual',
+          confidence: 1,
+          needsVerification: false,
+          reason: 'Manually confirmed'
+        }
+      }
+    })
+
+    setFieldsNeedingReview((prev) => prev.filter((key) => key !== field))
   }
 
   const handleFileSelection = async (selectedFile: File | null) => {
@@ -170,13 +273,17 @@ export default function EditContract() {
       setStatusMessage('Parsing contract with AI…')
 
       const parserData = await invokeParser(objectPath, user.id)
+      const contractPayload = parserData.parsedContract
 
-      setFormData(parserData.parsedContract)
+      setFormData(contractPayload)
       setRiskItems(parserData.riskItems ?? [])
       setDiagnostics(parserData.diagnostics ?? null)
+      setFieldMeta(parserData.fieldMeta ?? null)
+      const reviewTargets = (parserData.needsVerification ?? []) as (keyof ParsedContract)[]
+      setFieldsNeedingReview(reviewTargets)
+      setDatesConfirmed(reviewTargets.length === 0)
       setReviewOpen(true)
       setStatusMessage('Parsed successfully. Review & confirm.')
-      setDatesConfirmed(false)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to parse contract.'
       toast({ title: 'Parsing failed', description: message, variant: 'destructive' })
@@ -225,6 +332,8 @@ export default function EditContract() {
         seller_name: formData.seller_name,
         seller_email: formData.seller_email,
         purchase_price: toNumber(formData.purchase_price),
+        earnest_money: toNumber(formData.earnest_money),
+        contract_date: formData.contract_date,
         closing_date: formData.closing_date,
         inspection_date: formData.inspection_date,
         inspection_response_date: formData.inspection_response_date,
@@ -246,6 +355,21 @@ export default function EditContract() {
         throw error
       }
 
+      if (storagePath) {
+        try {
+          await supabase.functions.invoke('contractParsing', {
+            body: {
+              contractId: data.id,
+              storagePath,
+              userId: user.id,
+              persist: true
+            }
+          })
+        } catch (syncError) {
+          console.error('[CONTRACT_FINALIZE_FAILED]', syncError)
+        }
+      }
+
       toast({
         title: 'Contract saved',
         description: diagnostics?.usedFallback
@@ -255,7 +379,6 @@ export default function EditContract() {
 
       resetState()
       setReviewOpen(false)
-      setDatesConfirmed(false)
       navigate(`/contracts/${data.id}`)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to save contract.'
@@ -334,13 +457,18 @@ export default function EditContract() {
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
               <p className="font-semibold text-slate-900">Parse ready</p>
               <p>We extracted key parties, dates, and risks. Review and confirm to save.</p>
-              <div className="mt-3 flex gap-2">
+              <div className="mt-3 flex flex-wrap gap-2">
                 <Button size="sm" onClick={() => setReviewOpen(true)}>
                   Review parsed contract
                 </Button>
                 {file && (
                   <Button size="sm" variant="ghost" onClick={() => handleFileSelection(file)}>
                     Re-run parsing
+                  </Button>
+                )}
+                {storagePath && (
+                  <Button size="sm" variant="ghost" onClick={handleDownloadOriginal} disabled={isGeneratingLink}>
+                    {isGeneratingLink ? 'Preparing download…' : 'Download original'}
                   </Button>
                 )}
               </div>
@@ -358,132 +486,229 @@ export default function EditContract() {
 
           {formData && (
             <div className="space-y-6">
-              {(() => {
-                const unclearDates = CRITICAL_DATES.filter(({ key }) => !formData[key])
-                if (unclearDates.length === 0) return null
-                return (
-                  <Alert variant="destructive">
-                    <AlertDescription>
-                      We could not confidently extract:{' '}
-                      {unclearDates.map((date) => date.label).join(', ')}. Please verify these dates before saving.
-                    </AlertDescription>
-                  </Alert>
-                )
-              })()}
+              {requiresManualReview && (
+                <Alert variant="destructive">
+                  <AlertDescription>
+                    AI needs confirmation for:{' '}
+                    {fieldsNeedingReview.map((field) => FIELD_LABELS[field]).join(', ')}. Please verify before saving.
+                  </AlertDescription>
+                </Alert>
+              )}
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <Label htmlFor="title">Title</Label>
+                  <Label htmlFor="title" className="flex items-center justify-between gap-2">
+                    <span>Title</span>
+                    {renderSourceBadge('title')}
+                  </Label>
                   <Input
                     id="title"
                     value={formData.title ?? ''}
                     onChange={(event) => handleFieldChange('title', event.target.value)}
                   />
+                  {renderFieldHint('title')}
                 </div>
                 <div>
-                  <Label htmlFor="property_address">Property address</Label>
+                  <Label htmlFor="property_address" className="flex items-center justify-between gap-2">
+                    <span>Property address</span>
+                    {renderSourceBadge('property_address')}
+                  </Label>
                   <Input
                     id="property_address"
                     value={formData.property_address ?? ''}
                     onChange={(event) => handleFieldChange('property_address', event.target.value)}
                   />
+                  {renderFieldHint('property_address')}
                 </div>
                 <div>
-                  <Label htmlFor="client_name">Client name</Label>
+                  <Label htmlFor="client_name" className="flex items-center justify-between gap-2">
+                    <span>Client name</span>
+                    {renderSourceBadge('client_name')}
+                  </Label>
                   <Input
                     id="client_name"
                     value={formData.client_name ?? ''}
                     onChange={(event) => handleFieldChange('client_name', event.target.value)}
                   />
+                  {renderFieldHint('client_name')}
                 </div>
                 <div>
-                  <Label htmlFor="purchase_price">Purchase price</Label>
+                  <Label htmlFor="contract_date" className="flex items-center justify-between gap-2">
+                    <span>Contract date</span>
+                    {renderSourceBadge('contract_date')}
+                  </Label>
+                  <Input
+                    id="contract_date"
+                    type="date"
+                    value={formData.contract_date ?? ''}
+                    onChange={(event) => handleFieldChange('contract_date', event.target.value)}
+                  />
+                  {renderFieldHint('contract_date')}
+                </div>
+                <div>
+                  <Label htmlFor="buyer_name" className="flex items-center justify-between gap-2">
+                    <span>Buyer name</span>
+                    {renderSourceBadge('buyer_name')}
+                  </Label>
+                  <Input
+                    id="buyer_name"
+                    value={formData.buyer_name ?? ''}
+                    onChange={(event) => handleFieldChange('buyer_name', event.target.value)}
+                  />
+                  {renderFieldHint('buyer_name')}
+                </div>
+                <div>
+                  <Label htmlFor="buyer_email" className="flex items-center justify-between gap-2">
+                    <span>Buyer email</span>
+                    {renderSourceBadge('buyer_email')}
+                  </Label>
+                  <Input
+                    id="buyer_email"
+                    value={formData.buyer_email ?? ''}
+                    onChange={(event) => handleFieldChange('buyer_email', event.target.value)}
+                  />
+                  {renderFieldHint('buyer_email')}
+                </div>
+                <div>
+                  <Label htmlFor="seller_name" className="flex items-center justify-between gap-2">
+                    <span>Seller name</span>
+                    {renderSourceBadge('seller_name')}
+                  </Label>
+                  <Input
+                    id="seller_name"
+                    value={formData.seller_name ?? ''}
+                    onChange={(event) => handleFieldChange('seller_name', event.target.value)}
+                  />
+                  {renderFieldHint('seller_name')}
+                </div>
+                <div>
+                  <Label htmlFor="seller_email" className="flex items-center justify-between gap-2">
+                    <span>Seller email</span>
+                    {renderSourceBadge('seller_email')}
+                  </Label>
+                  <Input
+                    id="seller_email"
+                    value={formData.seller_email ?? ''}
+                    onChange={(event) => handleFieldChange('seller_email', event.target.value)}
+                  />
+                  {renderFieldHint('seller_email')}
+                </div>
+                <div>
+                  <Label htmlFor="purchase_price" className="flex items-center justify-between gap-2">
+                    <span>Purchase price</span>
+                    {renderSourceBadge('purchase_price')}
+                  </Label>
                   <Input
                     id="purchase_price"
                     value={formData.purchase_price ?? ''}
                     onChange={(event) => handleFieldChange('purchase_price', event.target.value)}
                   />
+                  {renderFieldHint('purchase_price')}
                 </div>
                 <div>
-                  <Label htmlFor="closing_date">Closing date</Label>
+                  <Label htmlFor="earnest_money" className="flex items-center justify-between gap-2">
+                    <span>Earnest money</span>
+                    {renderSourceBadge('earnest_money')}
+                  </Label>
+                  <Input
+                    id="earnest_money"
+                    value={formData.earnest_money ?? ''}
+                    onChange={(event) => handleFieldChange('earnest_money', event.target.value)}
+                  />
+                  {renderFieldHint('earnest_money')}
+                </div>
+                <div>
+                  <Label htmlFor="closing_date" className="flex items-center justify-between gap-2">
+                    <span>Closing date</span>
+                    {renderSourceBadge('closing_date')}
+                  </Label>
                   <Input
                     id="closing_date"
                     type="date"
                     value={formData.closing_date ?? ''}
                     onChange={(event) => handleFieldChange('closing_date', event.target.value)}
                   />
+                  {renderFieldHint('closing_date')}
                 </div>
                 <div>
-                  <Label htmlFor="inspection_date">Inspection date</Label>
+                  <Label htmlFor="inspection_date" className="flex items-center justify-between gap-2">
+                    <span>Inspection date</span>
+                    {renderSourceBadge('inspection_date')}
+                  </Label>
                   <Input
                     id="inspection_date"
                     type="date"
                     value={formData.inspection_date ?? ''}
                     onChange={(event) => handleFieldChange('inspection_date', event.target.value)}
                   />
+                  {renderFieldHint('inspection_date')}
                 </div>
                 <div>
-                  <Label htmlFor="inspection_response_date">Inspection response</Label>
+                  <Label htmlFor="inspection_response_date" className="flex items-center justify-between gap-2">
+                    <span>Inspection response</span>
+                    {renderSourceBadge('inspection_response_date')}
+                  </Label>
                   <Input
                     id="inspection_response_date"
                     type="date"
                     value={formData.inspection_response_date ?? ''}
                     onChange={(event) => handleFieldChange('inspection_response_date', event.target.value)}
                   />
+                  {renderFieldHint('inspection_response_date')}
                 </div>
                 <div>
-                  <Label htmlFor="loan_contingency_date">Loan contingency</Label>
+                  <Label htmlFor="loan_contingency_date" className="flex items-center justify-between gap-2">
+                    <span>Loan contingency</span>
+                    {renderSourceBadge('loan_contingency_date')}
+                  </Label>
                   <Input
                     id="loan_contingency_date"
                     type="date"
                     value={formData.loan_contingency_date ?? ''}
                     onChange={(event) => handleFieldChange('loan_contingency_date', event.target.value)}
                   />
+                  {renderFieldHint('loan_contingency_date')}
                 </div>
                 <div>
-                  <Label htmlFor="appraisal_date">Appraisal date</Label>
+                  <Label htmlFor="appraisal_date" className="flex items-center justify-between gap-2">
+                    <span>Appraisal date</span>
+                    {renderSourceBadge('appraisal_date')}
+                  </Label>
                   <Input
                     id="appraisal_date"
                     type="date"
                     value={formData.appraisal_date ?? ''}
                     onChange={(event) => handleFieldChange('appraisal_date', event.target.value)}
                   />
+                  {renderFieldHint('appraisal_date')}
                 </div>
                 <div>
-                  <Label htmlFor="final_walkthrough_date">Final walkthrough</Label>
+                  <Label htmlFor="final_walkthrough_date" className="flex items-center justify-between gap-2">
+                    <span>Final walkthrough</span>
+                    {renderSourceBadge('final_walkthrough_date')}
+                  </Label>
                   <Input
                     id="final_walkthrough_date"
                     type="date"
                     value={formData.final_walkthrough_date ?? ''}
                     onChange={(event) => handleFieldChange('final_walkthrough_date', event.target.value)}
                   />
-                </div>
-                <div>
-                  <Label htmlFor="buyer_email">Buyer email</Label>
-                  <Input
-                    id="buyer_email"
-                    value={formData.buyer_email ?? ''}
-                    onChange={(event) => handleFieldChange('buyer_email', event.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="seller_email">Seller email</Label>
-                  <Input
-                    id="seller_email"
-                    value={formData.seller_email ?? ''}
-                    onChange={(event) => handleFieldChange('seller_email', event.target.value)}
-                  />
+                  {renderFieldHint('final_walkthrough_date')}
                 </div>
               </div>
 
               <div>
-                <Label htmlFor="summary">Executive summary</Label>
+                <Label htmlFor="summary" className="flex items-center justify-between gap-2">
+                  <span>Executive summary</span>
+                  {renderSourceBadge('summary')}
+                </Label>
                 <Textarea
                   id="summary"
                   value={formData.summary ?? ''}
                   onChange={(event) => handleFieldChange('summary', event.target.value)}
                   rows={4}
                 />
+                {renderFieldHint('summary')}
               </div>
 
               {riskItems.length > 0 && (
@@ -511,17 +736,19 @@ export default function EditContract() {
                 </div>
               )}
 
-              <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                <Checkbox
-                  id="confirm-dates"
-                  checked={datesConfirmed}
-                  onCheckedChange={(checked) => setDatesConfirmed(Boolean(checked))}
-                  className="mt-1"
-                />
-                <label htmlFor="confirm-dates" className="cursor-pointer">
-                  I reviewed every deadline above and confirm they are accurate before adding this contract to my calendar.
-                </label>
-              </div>
+              {requiresManualReview && (
+                <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                  <Checkbox
+                    id="confirm-dates"
+                    checked={datesConfirmed}
+                    onCheckedChange={(checked) => setDatesConfirmed(Boolean(checked))}
+                    className="mt-1"
+                  />
+                  <label htmlFor="confirm-dates" className="cursor-pointer">
+                    I reviewed {fieldsNeedingReview.map((field) => FIELD_LABELS[field]).join(', ')} and confirm they are accurate.
+                  </label>
+                </div>
+              )}
             </div>
           )}
 
@@ -529,7 +756,7 @@ export default function EditContract() {
             <Button variant="outline" onClick={() => setReviewOpen(false)}>
               Back
             </Button>
-            <Button onClick={handleConfirm} disabled={isSaving || !datesConfirmed}>
+            <Button onClick={handleConfirm} disabled={isSaving || (requiresManualReview && !datesConfirmed)}>
               {isSaving ? 'Saving…' : 'Save contract'}
             </Button>
           </DialogFooter>
