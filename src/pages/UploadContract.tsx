@@ -1,5 +1,5 @@
 import { useEffect, useState, type ChangeEvent } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/components/providers/AuthProvider'
 import { supabase } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -7,8 +7,14 @@ import { useToast } from '@/components/ui/use-toast'
 
 console.log('🔥 UploadContract LOADED')
 
+const DEFAULT_STATUSES = {
+  uploaded: 'uploaded',
+  parsingFailed: 'parsed_fallback'
+}
+
 export default function UploadContract() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const { toast } = useToast()
   const [uploading, setUploading] = useState(false)
   const [authReady, setAuthReady] = useState(false)
@@ -43,21 +49,45 @@ export default function UploadContract() {
 
     setUploading(true)
 
+    let contractId: string | null = null
+
     try {
-      const fileExt = file.name.split('.').pop()
-      const filePath = `${user.id}/${Date.now()}.${fileExt || 'pdf'}`
+      const fileExt = file.name.split('.').pop() || 'pdf'
+      const uniqueId = crypto.randomUUID()
+      const filePath = `${user.id}/${uniqueId}.${fileExt}`
 
       const { error: uploadError } = await supabase.storage.from('contracts').upload(filePath, file, {
-        upsert: true
+        upsert: false,
+        cacheControl: '3600',
+        contentType: file.type || 'application/pdf',
+        metadata: { owner: user.id }
       })
 
       if (uploadError) {
         console.error('Upload error:', uploadError)
         toast({ title: 'Upload failed', description: uploadError.message, variant: 'destructive' })
-        setUploading(false)
         return
       }
 
+      const title = file.name.replace(/\.[^/.]+$/, '') || 'Untitled contract'
+      const { data: contract, error: insertError } = await supabase
+        .from('contracts')
+        .insert({
+          user_id: user.id,
+          title,
+          contract_file_url: filePath,
+          status: DEFAULT_STATUSES.uploaded
+        })
+        .select()
+        .single()
+
+      if (insertError || !contract) {
+        console.error('Contract insert error:', insertError)
+        toast({ title: 'Upload failed', description: 'Unable to create contract record.', variant: 'destructive' })
+        return
+      }
+
+      contractId = contract.id
       toast({ title: 'Uploaded', description: 'Parsing…' })
 
       const { data: sessionData } = await supabase.auth.getSession()
@@ -65,13 +95,14 @@ export default function UploadContract() {
       if (!accessToken) {
         console.error('Missing access token.')
         toast({ title: 'Auth error', description: 'Please log in again.', variant: 'destructive' })
-        setUploading(false)
         return
       }
 
       const payload = {
         storagePath: filePath,
-        userId: user.id
+        userId: user.id,
+        contractId: contract.id,
+        persist: true
       }
 
       console.log('📤 Invoking contractParsing with:', payload)
@@ -90,16 +121,29 @@ export default function UploadContract() {
       console.log('👤 Current session:', session)
 
       if (parseError) {
+        console.error('Parse error:', parseError)
+        await supabase
+          .from('contracts')
+          .update({ status: DEFAULT_STATUSES.parsingFailed })
+          .eq('id', contract.id)
+          .eq('user_id', user.id)
         toast({ title: 'Parsing failed', description: 'Our team was notified.', variant: 'destructive' })
-        setUploading(false)
         return
       }
 
       console.log('Parsing complete:', parseData)
       toast({ title: 'Contract parsed', description: 'Successfully processed!' })
+      navigate(`/contracts/${contract.id}`)
     } catch (error) {
       console.error('Unexpected error:', error)
       toast({ title: 'Upload failed', description: 'Something went wrong.', variant: 'destructive' })
+      if (contractId) {
+        await supabase
+          .from('contracts')
+          .update({ status: DEFAULT_STATUSES.parsingFailed })
+          .eq('id', contractId)
+          .eq('user_id', user.id)
+      }
     } finally {
       setUploading(false)
     }
