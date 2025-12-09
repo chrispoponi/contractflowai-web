@@ -69,12 +69,10 @@ export default function UploadContract() {
         return
       }
 
-      const title = file.name.replace(/\.[^/.]+$/, '') || 'Untitled contract'
       const { data: contract, error: insertError } = await supabase
         .from('contracts')
         .insert({
           user_id: user.id,
-          title,
           contract_file_url: filePath,
           status: DEFAULT_STATUSES.uploaded
         })
