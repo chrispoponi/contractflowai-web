@@ -74,7 +74,7 @@ export default function UploadContract() {
         .insert({
           user_id: user.id,
           contract_file_url: filePath,
-          status: DEFAULT_STATUSES.uploaded
+          status: 'under_contract'
         })
         .select()
         .single()
