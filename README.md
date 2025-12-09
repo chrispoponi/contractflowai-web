@@ -33,6 +33,7 @@ SUPABASE_URL=https://uehjpftyvycbrketwhwg.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=...
 STRIPE_SECRET_KEY=sk_live_or_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
+RESEND_API_KEY=re_xxx
 ```
 
 When creating Stripe Buy Buttons / Checkout Sessions be sure to include metadata:
@@ -44,7 +45,7 @@ That metadata lets the webhook map payments back to Supabase rows automatically.
 
 ## Supabase Edge Functions
 
-Functions live in `supabase/functions/*` and cover timeline generation, file uploads, reminder automation, referrals, subscription renewals, Stripe webhooks, counter-offer creation, and contract parsing.
+Functions live in `supabase/functions/*` and cover timeline generation, file uploads, reminder automation, referrals, subscription renewals, Stripe webhooks, counter-offer creation, contract parsing, and transactional emails (via `sendContractEmail` + Resend).
 
 ## Deploying
 

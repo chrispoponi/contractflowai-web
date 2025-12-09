@@ -18,7 +18,7 @@ export function EmailSummaryModal({ open, onClose, summary, contractId }: EmailS
   const { toast } = useToast()
   const [email, setEmail] = useState('')
   const [message, setMessage] = useState(summary)
-  const [isSending, setIsSending] = useState(false)
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -33,13 +33,13 @@ export function EmailSummaryModal({ open, onClose, summary, contractId }: EmailS
       toast({ title: 'Email required', description: 'Please enter a recipient email.', variant: 'destructive' })
       return
     }
-    setIsSending(true)
+    setLoading(true)
     try {
       const { error } = await supabase.functions.invoke('sendContractEmail', {
         body: {
-          contractId,
+          email,
           summary: message,
-          recipient: email
+          contractId
         }
       })
       if (error) {
@@ -55,7 +55,7 @@ export function EmailSummaryModal({ open, onClose, summary, contractId }: EmailS
         variant: 'destructive'
       })
     } finally {
-      setIsSending(false)
+      setLoading(false)
     }
   }
 
@@ -88,11 +88,11 @@ export function EmailSummaryModal({ open, onClose, summary, contractId }: EmailS
             />
           </div>
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSending}>
-              {isSending ? 'Sending…' : 'Send email summary'}
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Sending…' : 'Send email summary'}
             </Button>
           </div>
         </form>
