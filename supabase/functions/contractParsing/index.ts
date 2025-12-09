@@ -209,8 +209,15 @@ serve(async (req) => {
     // -----------------------------------------------------------------------
     // 5. Return results to frontend
     // -----------------------------------------------------------------------
+    const deadlineMap = mapDeadlines(finalSummary.deadlines);
+
     return new Response(
-      JSON.stringify({ summary: finalSummary, attempts }),
+      JSON.stringify({
+        summary: finalSummary.executive_summary,
+        deadlines: deadlineMap,
+        contractId,
+        attempts,
+      }),
       {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -384,11 +391,12 @@ async function updateContractRecord(
     buyer_name: summary.parties.buyer,
     seller_name: summary.parties.seller,
     agent_notes: summary.executive_summary,
-    inspection_date: deadlines.inspection ?? null,
-    inspection_response_date: deadlines.inspection_response ?? null,
-    appraisal_date: deadlines.appraisal ?? null,
-    loan_contingency_date: deadlines.loan ?? null,
-    closing_date: deadlines.closing ?? null,
+    inspection_date: deadlines.inspection_date ?? null,
+    inspection_response_date: deadlines.inspection_response_date ?? null,
+    appraisal_date: deadlines.appraisal_date ?? null,
+    loan_contingency_date: deadlines.loan_contingency_date ?? null,
+    final_walkthrough_date: deadlines.final_walkthrough_date ?? null,
+    closing_date: deadlines.closing_date ?? null,
     ai_summary: summary.executive_summary,
     summary_path: summaryPath,
     updated_at: new Date().toISOString(),
@@ -407,25 +415,28 @@ async function updateContractRecord(
 
 function mapDeadlines(deadlines: { name: string; date: string | null }[]) {
   const result: Record<string, string | null> = {
-    inspection: null,
-    inspection_response: null,
-    appraisal: null,
-    loan: null,
-    closing: null,
+    inspection_date: null,
+    inspection_response_date: null,
+    appraisal_date: null,
+    loan_contingency_date: null,
+    final_walkthrough_date: null,
+    closing_date: null,
   };
 
   deadlines.forEach(({ name, date }) => {
     const normalized = name.toLowerCase();
     if (normalized.includes("response")) {
-      result.inspection_response = date;
+      result.inspection_response_date = date;
     } else if (normalized.includes("inspection")) {
-      result.inspection = date;
+      result.inspection_date = date;
     } else if (normalized.includes("appraisal")) {
-      result.appraisal = date;
-    } else if (normalized.includes("loan") || normalized.includes("financing")) {
-      result.loan = date;
+      result.appraisal_date = date;
+    } else if (normalized.includes("loan") || normalized.includes("financing") || normalized.includes("contingency")) {
+      result.loan_contingency_date = date;
+    } else if (normalized.includes("walkthrough")) {
+      result.final_walkthrough_date = date;
     } else if (normalized.includes("closing") || normalized.includes("settlement")) {
-      result.closing = date;
+      result.closing_date = date;
     }
   });
 
@@ -561,6 +572,7 @@ async function runMicroExtractorFromBytes(fileBytes: Uint8Array): Promise<Normal
     { name: "Inspection", keywords: ["inspection response", "inspection deadline", "inspection date"] },
     { name: "Appraisal", keywords: ["appraisal deadline", "appraisal date"] },
     { name: "Loan Contingency", keywords: ["loan contingency", "financing contingency", "loan approval"] },
+    { name: "Final Walkthrough", keywords: ["final walkthrough", "walk-through date"] },
     { name: "Closing", keywords: ["closing date", "settlement date"] },
     { name: "Earnest Money", keywords: ["earnest money due", "earnest money deadline"] },
   ];
