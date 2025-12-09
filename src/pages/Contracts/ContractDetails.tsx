@@ -23,7 +23,25 @@ const statusColors: Record<string, string> = {
   financing: 'bg-indigo-100 text-indigo-800',
   closing: 'bg-emerald-100 text-emerald-800',
   closed: 'bg-green-100 text-green-800',
-  cancelled: 'bg-rose-100 text-rose-800'
+  cancelled: 'bg-rose-100 text-rose-800',
+  uploaded: 'bg-slate-100 text-slate-700',
+  text_extracted: 'bg-blue-100 text-blue-800',
+  parsed_primary: 'bg-emerald-100 text-emerald-800',
+  parsed_fallback: 'bg-amber-100 text-amber-800',
+  validated: 'bg-indigo-100 text-indigo-800',
+  completed: 'bg-green-100 text-green-800',
+  error: 'bg-rose-200 text-rose-800'
+}
+
+type ParsedSummary = {
+  executive_summary?: string
+  parties?: {
+    buyer?: string | null
+    seller?: string | null
+    agents?: string | null
+  }
+  deadlines?: { name: string; date: string | null }[]
+  risks?: { severity?: string; description?: string }[]
 }
 
 type Contract = Tables<'contracts'>
@@ -114,6 +132,33 @@ export default function ContractDetails() {
     return Object.entries(contract.timeline as Record<string, unknown>)
   }, [contract?.timeline])
 
+  const summaryPath = contract?.summary_path
+  const metadataPath = summaryPath ? summaryPath.replace('summary.json', 'metadata.json') : null
+
+  const { data: parsedSummary, isLoading: summaryLoading } = useQuery({
+    queryKey: ['contract-summary', summaryPath],
+    enabled: Boolean(summaryPath),
+    queryFn: async () => {
+      if (!summaryPath) return null
+      const { data, error } = await supabase.storage.from('contracts').download(summaryPath)
+      if (error || !data) throw error ?? new Error('Unable to download summary')
+      const text = await data.text()
+      return JSON.parse(text) as ParsedSummary
+    }
+  })
+
+  const { data: metadata } = useQuery({
+    queryKey: ['contract-summary-metadata', metadataPath],
+    enabled: Boolean(metadataPath),
+    queryFn: async () => {
+      if (!metadataPath) return null
+      const { data, error } = await supabase.storage.from('contracts').download(metadataPath)
+      if (error || !data) throw error ?? new Error('Unable to download metadata')
+      const text = await data.text()
+      return JSON.parse(text) as Record<string, unknown>
+    }
+  })
+
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -196,6 +241,73 @@ export default function ContractDetails() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>AI Summary</CardTitle>
+          {metadata && (
+            <p className="text-xs text-slate-500">
+              Model: {metadata.model ?? 'n/a'} • Generated:{' '}
+              {metadata.generated_at ? new Date(metadata.generated_at as string).toLocaleString() : 'n/a'} • Fallback:{' '}
+              {metadata.usedFallback ? 'Yes' : 'No'}
+            </p>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {summaryLoading && <p className="text-sm text-slate-500">Loading summary…</p>}
+          {!summaryLoading && !parsedSummary && (
+            <p className="text-sm text-slate-500">No AI summary available yet. Upload a contract to generate one.</p>
+          )}
+          {parsedSummary && (
+            <>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-slate-500">Executive summary</p>
+                <p className="text-base text-slate-900">{parsedSummary.executive_summary ?? 'Not provided.'}</p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-3">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Buyer</p>
+                  <p className="text-sm text-slate-900">{parsedSummary.parties?.buyer ?? '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Seller</p>
+                  <p className="text-sm text-slate-900">{parsedSummary.parties?.seller ?? '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Agents</p>
+                  <p className="text-sm text-slate-900">{parsedSummary.parties?.agents ?? '—'}</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-slate-500">Deadlines</p>
+                <div className="mt-2 space-y-2">
+                  {(parsedSummary.deadlines ?? []).length === 0 && <p className="text-sm text-slate-500">No deadlines extracted.</p>}
+                  {(parsedSummary.deadlines ?? []).map((deadline, index) => (
+                    <div key={`${deadline.name}-${index}`} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                      <span className="font-medium text-slate-900">{deadline.name}</span>
+                      <span className="text-slate-600">{deadline.date ?? 'TBD'}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-slate-500">Risk highlights</p>
+                <div className="mt-2 space-y-2">
+                  {(parsedSummary.risks ?? []).length === 0 && <p className="text-sm text-slate-500">No risk items flagged.</p>}
+                  {(parsedSummary.risks ?? []).map((risk, index) => (
+                    <div key={`${risk.description}-${index}`} className="rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                      <span className="mr-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs uppercase tracking-wide text-slate-600">
+                        {risk.severity ?? 'info'}
+                      </span>
+                      <span className="text-slate-700">{risk.description}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
