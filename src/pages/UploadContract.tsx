@@ -15,6 +15,15 @@ const DEFAULT_STATUSES = {
   parsingFailed: 'parsed_fallback'
 }
 
+const DEADLINE_DEFINITIONS = [
+  { key: 'inspection_date', label: 'Inspection' },
+  { key: 'inspection_response_date', label: 'Inspection Response' },
+  { key: 'appraisal_date', label: 'Appraisal' },
+  { key: 'loan_contingency_date', label: 'Loan Contingency' },
+  { key: 'final_walkthrough_date', label: 'Final Walkthrough' },
+  { key: 'closing_date', label: 'Closing' }
+] as const
+
 type ContractParsingResult = {
   summary: string
   deadlines: Record<string, string | null>
@@ -46,6 +55,15 @@ export default function UploadContract() {
       mounted = false
     }
   }, [])
+
+  const deadlineList = useMemo(() => {
+    if (!parsingResult) return []
+    return DEADLINE_DEFINITIONS.map(({ key, label }) => {
+      const date = parsingResult.deadlines?.[key] ?? null
+      const completed = Boolean(date && Date.parse(date) < Date.now())
+      return { label, date, completed }
+    })
+  }, [parsingResult])
 
   if (!authReady) {
     return (
@@ -175,24 +193,6 @@ export default function UploadContract() {
     }
   }
 
-  const deadlineDefinitions = [
-    { key: 'inspection_date', label: 'Inspection' },
-    { key: 'inspection_response_date', label: 'Inspection Response' },
-    { key: 'appraisal_date', label: 'Appraisal' },
-    { key: 'loan_contingency_date', label: 'Loan Contingency' },
-    { key: 'final_walkthrough_date', label: 'Final Walkthrough' },
-    { key: 'closing_date', label: 'Closing' }
-  ] as const
-
-  const deadlineList = useMemo(() => {
-    if (!parsingResult) return []
-    return deadlineDefinitions.map(({ key, label }) => {
-      const date = parsingResult.deadlines?.[key] ?? null
-      const completed = Boolean(date && Date.parse(date) < Date.now())
-      return { label, date, completed }
-    })
-  }, [parsingResult])
-
   const formatICSDate = (date: Date) => {
     return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
   }
@@ -207,7 +207,7 @@ export default function UploadContract() {
       'PRODID:-//ContractFlowAI//EN'
     ]
 
-    deadlineDefinitions.forEach(({ key, label }) => {
+    DEADLINE_DEFINITIONS.forEach(({ key, label }) => {
       const date = parsingResult.deadlines?.[key]
       if (!date) return
       const normalized = date.replace(/-/g, '')
