@@ -128,7 +128,25 @@ serve(async (req) => {
     });
 
     const summaryData = JSON.parse(openaiResponse.choices[0].message.content);
-    console.log("🤖 Parsed contract summary:", summaryData);
+    const primaryResult = normalizeAndValidate(summaryData);
+
+    if (!primaryResult.valid) {
+      console.warn("⚠️ Primary parser validation failed", primaryResult.errors);
+    }
+
+    const finalSummary =
+      primaryResult.valid && primaryResult.summary
+        ? primaryResult.summary
+        : await runFallbackExtractor(fileData);
+
+    if (!finalSummary) {
+      return new Response(
+        JSON.stringify({ error: "Unable to parse contract." }),
+        { status: 500, headers: corsHeaders }
+      );
+    }
+
+    console.log("🤖 Parsed contract summary:", finalSummary);
 
     // -----------------------------------------------------------------------
     // 3. Save JSON summary to Supabase Storage
@@ -139,7 +157,7 @@ serve(async (req) => {
       .from(CONTRACTS_BUCKET)
       .upload(
         summaryPath,
-        new Blob([JSON.stringify(summaryData, null, 2)], {
+        new Blob([JSON.stringify(finalSummary, null, 2)], {
           type: "application/json",
         }),
         { upsert: true }
@@ -159,7 +177,7 @@ serve(async (req) => {
     const { error: dbError } = await supabase
       .from("contracts")
       .update({
-        ai_summary: summaryData.executive_summary,
+        ai_summary: finalSummary.executive_summary,
         summary_path: summaryPath,
         updated_at: new Date().toISOString(),
       })
@@ -173,7 +191,7 @@ serve(async (req) => {
     // -----------------------------------------------------------------------
     // 5. Return results to frontend
     // -----------------------------------------------------------------------
-    return new Response(JSON.stringify(summaryData), {
+    return new Response(JSON.stringify(finalSummary), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -185,3 +203,128 @@ serve(async (req) => {
     });
   }
 });
+
+// -----------------------------------------------------------------------------
+// Validation & Fallback Helpers
+// -----------------------------------------------------------------------------
+
+type NormalizedSummary = {
+  executive_summary: string;
+  parties: { buyer: string | null; seller: string | null; agents: string | null };
+  deadlines: { name: string; date: string | null }[];
+  risks: { severity: string; description: string }[];
+};
+
+function normalizeAndValidate(payload: Record<string, unknown>) {
+  const errors: string[] = [];
+  const executive_summary =
+    typeof payload.executive_summary === "string" && payload.executive_summary.trim().length > 0
+      ? payload.executive_summary.trim()
+      : null;
+  if (!executive_summary) errors.push("Missing executive_summary");
+
+  const partiesRaw = payload.parties as Record<string, unknown> | undefined;
+  const parties = {
+    buyer: typeof partiesRaw?.buyer === "string" ? partiesRaw.buyer.trim() : null,
+    seller: typeof partiesRaw?.seller === "string" ? partiesRaw.seller.trim() : null,
+    agents: typeof partiesRaw?.agents === "string" ? partiesRaw.agents.trim() : null
+  };
+
+  const deadlines = Array.isArray(payload.deadlines)
+    ? (payload.deadlines as any[])
+        .map((deadline) => {
+          const name = typeof deadline?.name === "string" ? deadline.name.trim() : null;
+          const date = typeof deadline?.date === "string" ? normalizeDate(deadline.date) : null;
+          return name ? { name, date } : null;
+        })
+        .filter(Boolean) as { name: string; date: string | null }[]
+    : [];
+  if (deadlines.length === 0) errors.push("No deadlines found");
+
+  const risks = Array.isArray(payload.risks)
+    ? (payload.risks as any[])
+        .map((risk) => {
+          if (typeof risk === "string") {
+            return { severity: "info", description: risk };
+          }
+          if (risk && typeof risk.description === "string") {
+            const severity = typeof risk.severity === "string" ? risk.severity.toLowerCase() : "info";
+            return { severity, description: risk.description };
+          }
+          return null;
+        })
+        .filter(Boolean) as { severity: string; description: string }[]
+    : [];
+
+  if (errors.length > 0) {
+    return { valid: false, errors };
+  }
+
+  const summary: NormalizedSummary = {
+    executive_summary,
+    parties,
+    deadlines,
+    risks
+  };
+
+  return { valid: true, summary };
+}
+
+function normalizeDate(raw: string) {
+  const trimmed = raw.trim();
+  const iso = Date.parse(trimmed);
+  if (!Number.isNaN(iso)) {
+    return new Date(iso).toISOString().split("T")[0];
+  }
+  const slashMatch = trimmed.match(/(\d{1,2})[\/](\d{1,2})[\/](\d{2,4})/);
+  if (slashMatch) {
+    const [, mm, dd, yyyy] = slashMatch;
+    const normalizedYear = yyyy.length === 2 ? `20${yyyy}` : yyyy;
+    return `${normalizedYear.padStart(4, "0")}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
+  }
+  return null;
+}
+
+async function runFallbackExtractor(fileData: Blob): Promise<NormalizedSummary | null> {
+  try {
+    const text = await fileData.text();
+    if (!text || text.replace(/\s+/g, "").length < 200) {
+      return null;
+    }
+
+    const findField = (label: string) => {
+      const regex = new RegExp(`${label}\\s*[:\\-]\\s*(.+)`, "i");
+      const match = text.match(regex);
+      return match?.[1]?.split("\n")[0]?.trim() ?? null;
+    };
+
+    const candidateDates = [
+      { name: "Inspection", label: "Inspection Date" },
+      { name: "Appraisal", label: "Appraisal Date" },
+      { name: "Loan Contingency", label: "Loan Contingency Date" },
+      { name: "Closing", label: "Closing Date" }
+    ];
+
+    const deadlines = candidateDates
+      .map(({ name, label }) => {
+        const raw = findField(label);
+        if (!raw) return null;
+        return { name, date: normalizeDate(raw) };
+      })
+      .filter(Boolean) as { name: string; date: string | null }[];
+
+    return {
+      executive_summary: findField("Summary") || "Contract summary pending detailed review.",
+      parties: {
+        buyer: findField("Buyer"),
+        seller: findField("Seller"),
+        agents: findField("Agent")
+      },
+      deadlines,
+      risks: []
+    };
+  } catch (error) {
+    console.error("Fallback extractor failed:", error);
+    return null;
+  }
+}
