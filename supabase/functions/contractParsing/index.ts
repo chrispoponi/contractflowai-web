@@ -18,6 +18,8 @@ const openai = new OpenAI({
 
 const CONTRACTS_BUCKET = "contracts";
 const SUMMARY_FOLDER = "summaries";
+const RAW_FOLDER = "raw";
+const MODEL_NAME = Deno.env.get("OPENAI_MODEL") ?? "gpt-4.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "https://contractflowai.us",
@@ -31,6 +33,10 @@ const corsHeaders = {
 // ---------------------------------------------------------------------------
 
 serve(async (req) => {
+  let requestUserId: string | null = null;
+  let requestContractId: string | null = null;
+  let requestStoragePath: string | null = null;
+
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -40,6 +46,9 @@ serve(async (req) => {
     console.log("📥 Incoming payload:", body);
 
     const { contractId, storagePath, userId } = body;
+    requestContractId = contractId ?? null;
+    requestStoragePath = storagePath ?? null;
+    requestUserId = userId ?? null;
 
     if (!storagePath || !userId || !contractId) {
       return new Response(
@@ -197,6 +206,10 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("🔥 Function crashed:", error);
+    await logError(requestUserId, String(error), { contractId: requestContractId, storagePath: requestStoragePath });
+    if (requestContractId) {
+      await updateContractStatus(requestContractId, "error");
+    }
     return new Response(JSON.stringify({ error: String(error) }), {
       status: 500,
       headers: corsHeaders,
@@ -204,6 +217,154 @@ serve(async (req) => {
   }
 });
 
+async function updateContractStatus(contractId: string, status: string) {
+  const { error } = await supabase
+    .from("contracts")
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq("id", contractId);
+
+  if (error) {
+    console.error(`[STATUS_${status}_FAILED]`, error);
+  }
+}
+
+async function persistRawDocument(contractId: string, bytes: Uint8Array) {
+  const rawPath = `${SUMMARY_FOLDER}/${contractId}/${RAW_FOLDER}.txt`;
+  const base64 = bytesToBase64(bytes);
+  const payload = JSON.stringify(
+    {
+      stored_at: new Date().toISOString(),
+      encoding: "base64",
+      data: base64,
+    },
+    null,
+    2
+  );
+
+  const { error } = await supabase.storage
+    .from(CONTRACTS_BUCKET)
+    .upload(rawPath, new Blob([payload], { type: "application/json" }), {
+      upsert: true,
+    });
+
+  if (error) {
+    console.error("[RAW_UPLOAD_FAILED]", error);
+  }
+}
+
+async function persistSummary(contractId: string, summary: NormalizedSummary) {
+  const path = `${SUMMARY_FOLDER}/${contractId}/summary.json`;
+  const { error } = await supabase.storage
+    .from(CONTRACTS_BUCKET)
+    .upload(path, new Blob([JSON.stringify(summary, null, 2)], { type: "application/json" }), {
+      upsert: true,
+    });
+
+  if (error) {
+    throw error;
+  }
+
+  return path;
+}
+
+async function persistMetadata(contractId: string, metadata: Record<string, unknown>) {
+  const path = `${SUMMARY_FOLDER}/${contractId}/metadata.json`;
+  const { error } = await supabase.storage
+    .from(CONTRACTS_BUCKET)
+    .upload(path, new Blob([JSON.stringify(metadata, null, 2)], { type: "application/json" }), {
+      upsert: true,
+    });
+
+  if (error) {
+    console.error("[METADATA_UPLOAD_FAILED]", error);
+  }
+}
+
+async function updateContractRecord(
+  contractId: string,
+  userId: string,
+  summary: NormalizedSummary,
+  summaryPath: string
+) {
+  const deadlines = mapDeadlines(summary.deadlines);
+
+  const payload = {
+    buyer_name: summary.parties.buyer,
+    seller_name: summary.parties.seller,
+    agent_notes: summary.executive_summary,
+    inspection_date: deadlines.inspection ?? null,
+    inspection_response_date: deadlines.inspection_response ?? null,
+    appraisal_date: deadlines.appraisal ?? null,
+    loan_contingency_date: deadlines.loan ?? null,
+    closing_date: deadlines.closing ?? null,
+    ai_summary: summary.executive_summary,
+    summary_path: summaryPath,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { error } = await supabase
+    .from("contracts")
+    .update(payload)
+    .eq("id", contractId)
+    .eq("user_id", userId);
+
+  if (error) {
+    console.error("[CONTRACT_UPDATE_FAILED]", error);
+  }
+}
+
+function mapDeadlines(deadlines: { name: string; date: string | null }[]) {
+  const result: Record<string, string | null> = {
+    inspection: null,
+    inspection_response: null,
+    appraisal: null,
+    loan: null,
+    closing: null,
+  };
+
+  deadlines.forEach(({ name, date }) => {
+    const normalized = name.toLowerCase();
+    if (normalized.includes("response")) {
+      result.inspection_response = date;
+    } else if (normalized.includes("inspection")) {
+      result.inspection = date;
+    } else if (normalized.includes("appraisal")) {
+      result.appraisal = date;
+    } else if (normalized.includes("loan") || normalized.includes("financing")) {
+      result.loan = date;
+    } else if (normalized.includes("closing") || normalized.includes("settlement")) {
+      result.closing = date;
+    }
+  });
+
+  return result;
+}
+
+async function logError(userId: string | null, message: string, payload?: Record<string, unknown>) {
+  try {
+    await supabase.from("feedback").insert({
+      user_id: userId,
+      topic: "contract_parsing_error",
+      sentiment: "negative",
+      message: null,
+      error_message: message,
+      raw_payload: payload ? JSON.stringify(payload).slice(0, 8000) : null,
+      created_at: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("[LOG_ERROR_FAILED]", err);
+  }
+}
+
+function bytesToBase64(bytes: Uint8Array) {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
+}
 // -----------------------------------------------------------------------------
 // Validation & Fallback Helpers
 // -----------------------------------------------------------------------------
