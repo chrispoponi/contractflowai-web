@@ -20,6 +20,60 @@ const CONTRACTS_BUCKET = "contracts";
 const SUMMARY_FOLDER = "summaries";
 const RAW_FOLDER = "raw";
 const MODEL_NAME = Deno.env.get("OPENAI_MODEL") ?? "gpt-4.1";
+const FALLBACK_MODEL = Deno.env.get("OPENAI_FALLBACK_MODEL") ?? "gpt-4o-mini";
+const MAX_TEXT_SNAPSHOT = 120_000;
+
+const SUMMARY_SCHEMA = {
+  type: "object",
+  properties: {
+    executive_summary: { type: "string" },
+    parties: {
+      type: "object",
+      properties: {
+        buyer: { type: "string" },
+        seller: { type: "string" },
+        agents: { type: "string" },
+      },
+    },
+    deadlines: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          date: { type: "string" },
+        },
+      },
+    },
+    risks: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          severity: { type: "string" },
+          description: { type: "string" },
+        },
+      },
+    },
+  },
+  required: ["executive_summary", "deadlines"],
+};
+
+const PRIMARY_PROMPT =
+  "You are an expert real estate contract analyzer. Return ONLY valid JSON (no prose) that mirrors the provided schema. Extract all important deadlines, parties, clauses, risk factors, and generate a clean JSON timeline + executive summary. Use null for unknown fields.";
+
+const FALLBACK_PROMPT =
+  "You are a conservative contract analyst. Extract only fields that explicitly exist in the document. Use null when unsure. Return valid JSON that matches the schema exactly.";
+
+type ParserStage = "primary" | "fallback" | "micro";
+
+type ParseAttemptLog = {
+  stage: ParserStage;
+  model: string;
+  success: boolean;
+  duration_ms: number;
+  error?: string;
+};
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "https://contractflowai.us",
@@ -57,6 +111,8 @@ serve(async (req) => {
       );
     }
 
+    await updateContractStatus(contractId, "uploaded");
+
     // -----------------------------------------------------------------------
     // 1. Download the PDF from Supabase Storage
     // -----------------------------------------------------------------------
@@ -66,6 +122,7 @@ serve(async (req) => {
 
     if (downloadError || !fileData) {
       console.error("❌ PDF download error:", downloadError);
+      await updateContractStatus(contractId, "error");
       return new Response(
         JSON.stringify({ error: "Failed to download PDF" }),
         { status: 500, headers: corsHeaders }
@@ -73,84 +130,57 @@ serve(async (req) => {
     }
 
     console.log("📄 PDF downloaded successfully.");
+    const fileBytes = new Uint8Array(await fileData.arrayBuffer());
+    await persistRawDocument(contractId, fileBytes);
+    await updateContractStatus(contractId, "text_extracted");
 
     // -----------------------------------------------------------------------
-    // 2. Send PDF to OpenAI GPT-4.1 for parsing
+    // 2. Auto-retry parsing pipeline (primary -> fallback -> micro)
     // -----------------------------------------------------------------------
+    const attempts: ParseAttemptLog[] = [];
+    let finalSummary: NormalizedSummary | null = null;
 
-    const openaiResponse = await openai.chat.completions.create({
-      model: "gpt-4.1",
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are an expert real estate contract analyzer. Extract all important deadlines, parties, clauses, risk factors, and generate a clean JSON timeline + executive summary.",
-        },
-        {
-          role: "user",
-          content: [
-            {
-              type: "input_text",
-              text: "Analyze this real estate contract PDF and extract all key information.",
-            },
-            {
-              type: "input_file",
-              mime_type: "application/pdf",
-              data: new Uint8Array(await fileData.arrayBuffer()),
-            },
-          ],
-        },
-      ],
-      response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: "contract_summary",
-          schema: {
-            type: "object",
-            properties: {
-              executive_summary: { type: "string" },
-              parties: {
-                type: "object",
-                properties: {
-                  buyer: { type: "string" },
-                  seller: { type: "string" },
-                  agents: { type: "string" },
-                },
-              },
-              deadlines: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    name: { type: "string" },
-                    date: { type: "string" },
-                  },
-                },
-              },
-              risks: { type: "array", items: { type: "string" } },
-            },
-            required: ["executive_summary", "deadlines"],
-          },
-        },
-      },
-      max_tokens: 8000,
-    });
+    const primaryAttempt = await attemptParse("primary", MODEL_NAME, () =>
+      parseWithModel(MODEL_NAME, fileBytes, PRIMARY_PROMPT)
+    );
+    attempts.push(primaryAttempt.log);
 
-    const summaryData = JSON.parse(openaiResponse.choices[0].message.content);
-    const primaryResult = normalizeAndValidate(summaryData);
+    if (primaryAttempt.summary) {
+      finalSummary = primaryAttempt.summary;
+      await updateContractStatus(contractId, "parsed_primary");
+    } else {
+      const fallbackAttempt = await attemptParse("fallback", FALLBACK_MODEL, () =>
+        parseWithModel(FALLBACK_MODEL, fileBytes, FALLBACK_PROMPT)
+      );
+      attempts.push(fallbackAttempt.log);
 
-    if (!primaryResult.valid) {
-      console.warn("⚠️ Primary parser validation failed", primaryResult.errors);
+      if (fallbackAttempt.summary) {
+        finalSummary = fallbackAttempt.summary;
+        await updateContractStatus(contractId, "parsed_fallback");
+      } else {
+        const microAttempt = await attemptParse("micro", "regex_extractor", () =>
+          runMicroExtractorFromBytes(fileBytes)
+        );
+        attempts.push(microAttempt.log);
+        if (microAttempt.summary) {
+          finalSummary = microAttempt.summary;
+          await updateContractStatus(contractId, "parsed_fallback");
+        }
+      }
     }
 
-    const finalSummary =
-      primaryResult.valid && primaryResult.summary
-        ? primaryResult.summary
-        : await runFallbackExtractor(fileData);
-
     if (!finalSummary) {
+      await logError(requestUserId, "Auto-retry exhausted without result", {
+        contractId,
+        storagePath,
+        attempts,
+      });
+      await updateContractStatus(contractId, "error");
       return new Response(
-        JSON.stringify({ error: "Unable to parse contract." }),
+        JSON.stringify({
+          error: "Unable to parse contract after retries.",
+          attempts,
+        }),
         { status: 500, headers: corsHeaders }
       );
     }
@@ -158,52 +188,34 @@ serve(async (req) => {
     console.log("🤖 Parsed contract summary:", finalSummary);
 
     // -----------------------------------------------------------------------
-    // 3. Save JSON summary to Supabase Storage
+    // 3. Save JSON summary + metadata to Supabase Storage
     // -----------------------------------------------------------------------
-    const summaryPath = `${SUMMARY_FOLDER}/${contractId}/summary.json`;
-
-    const { error: uploadError } = await supabase.storage
-      .from(CONTRACTS_BUCKET)
-      .upload(
-        summaryPath,
-        new Blob([JSON.stringify(finalSummary, null, 2)], {
-          type: "application/json",
-        }),
-        { upsert: true }
-      );
-
-    if (uploadError) {
-      console.error("❌ Summary upload error:", uploadError);
-      return new Response(
-        JSON.stringify({ error: "Failed to store summary" }),
-        { status: 500, headers: corsHeaders }
-      );
-    }
+    const summaryPath = await persistSummary(contractId, finalSummary);
+    await persistMetadata(contractId, {
+      generated_at: new Date().toISOString(),
+      model: attempts.find((attempt) => attempt.success)?.model ?? MODEL_NAME,
+      usedFallback: !attempts[0]?.success,
+      deadlines_detected: finalSummary.deadlines.length,
+      attempts,
+    });
+    await updateContractStatus(contractId, "validated");
 
     // -----------------------------------------------------------------------
     // 4. Update DB
     // -----------------------------------------------------------------------
-    const { error: dbError } = await supabase
-      .from("contracts")
-      .update({
-        ai_summary: finalSummary.executive_summary,
-        summary_path: summaryPath,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", contractId)
-      .eq("user_id", userId);
-
-    if (dbError) {
-      console.error("❌ DB update error:", dbError);
-    }
+    await updateContractRecord(contractId, userId, finalSummary, summaryPath);
+    await updateContractStatus(contractId, "completed");
 
     // -----------------------------------------------------------------------
     // 5. Return results to frontend
     // -----------------------------------------------------------------------
-    return new Response(JSON.stringify(finalSummary), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ summary: finalSummary, attempts }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
   } catch (error) {
     console.error("🔥 Function crashed:", error);
     await logError(requestUserId, String(error), { contractId: requestContractId, storagePath: requestStoragePath });
@@ -278,6 +290,86 @@ async function persistMetadata(contractId: string, metadata: Record<string, unkn
   if (error) {
     console.error("[METADATA_UPLOAD_FAILED]", error);
   }
+}
+
+type AttemptResult = { summary: NormalizedSummary | null; log: ParseAttemptLog };
+
+async function attemptParse(stage: ParserStage, model: string, fn: () => Promise<NormalizedSummary>): Promise<AttemptResult> {
+  const started = performance.now();
+  const log: ParseAttemptLog = {
+    stage,
+    model,
+    success: false,
+    duration_ms: 0,
+  };
+
+  try {
+    const summary = await fn();
+    log.success = true;
+    log.duration_ms = Math.round(performance.now() - started);
+    return { summary, log };
+  } catch (error) {
+    log.error = error instanceof Error ? error.message : String(error);
+    log.duration_ms = Math.round(performance.now() - started);
+    console.error(`[${stage.toUpperCase()}_FAILED]`, error);
+    return { summary: null, log };
+  }
+}
+
+async function parseWithModel(model: string, fileBytes: Uint8Array, prompt: string): Promise<NormalizedSummary> {
+  const response = await openai.chat.completions.create({
+    model,
+    temperature: model === FALLBACK_MODEL ? 0.2 : 0.1,
+    max_tokens: 8000,
+    messages: [
+      {
+        role: "system",
+        content: prompt,
+      },
+      {
+        role: "user",
+        content: [
+          {
+            type: "input_text",
+            text: "Analyze this real estate contract PDF and extract all key information for the schema.",
+          },
+          {
+            type: "input_file",
+            mime_type: "application/pdf",
+            data: fileBytes,
+          },
+        ],
+      },
+    ],
+    response_format: {
+      type: "json_schema",
+      json_schema: {
+        name: "contract_summary",
+        schema: SUMMARY_SCHEMA,
+        strict: true,
+      },
+    },
+  });
+
+  const messageContent = response.choices?.[0]?.message?.content;
+  if (!messageContent) {
+    throw new Error("Model returned empty response");
+  }
+
+  let parsedPayload: Record<string, unknown>;
+  try {
+    parsedPayload = JSON.parse(messageContent);
+  } catch {
+    throw new Error("Model response was not valid JSON");
+  }
+
+  const result = normalizeAndValidate(parsedPayload);
+  if (!result.valid || !result.summary) {
+    const errors = (result as { errors?: string[] }).errors ?? [];
+    throw new Error(`Validation failed: ${errors.join(", ") || "unknown error"}`);
+  }
+
+  return result.summary;
 }
 
 async function updateContractRecord(
@@ -446,46 +538,89 @@ function normalizeDate(raw: string) {
   return null;
 }
 
-async function runFallbackExtractor(fileData: Blob): Promise<NormalizedSummary | null> {
-  try {
-    const text = await fileData.text();
-    if (!text || text.replace(/\s+/g, "").length < 200) {
-      return null;
-    }
-
-    const findField = (label: string) => {
-      const regex = new RegExp(`${label}\\s*[:\\-]\\s*(.+)`, "i");
-      const match = text.match(regex);
-      return match?.[1]?.split("\n")[0]?.trim() ?? null;
-    };
-
-    const candidateDates = [
-      { name: "Inspection", label: "Inspection Date" },
-      { name: "Appraisal", label: "Appraisal Date" },
-      { name: "Loan Contingency", label: "Loan Contingency Date" },
-      { name: "Closing", label: "Closing Date" }
-    ];
-
-    const deadlines = candidateDates
-      .map(({ name, label }) => {
-        const raw = findField(label);
-        if (!raw) return null;
-        return { name, date: normalizeDate(raw) };
-      })
-      .filter(Boolean) as { name: string; date: string | null }[];
-
-    return {
-      executive_summary: findField("Summary") || "Contract summary pending detailed review.",
-      parties: {
-        buyer: findField("Buyer"),
-        seller: findField("Seller"),
-        agents: findField("Agent")
-      },
-      deadlines,
-      risks: []
-    };
-  } catch (error) {
-    console.error("Fallback extractor failed:", error);
-    return null;
+async function runMicroExtractorFromBytes(fileBytes: Uint8Array): Promise<NormalizedSummary> {
+  const text = toTextSnapshot(fileBytes);
+  if (!text || text.replace(/\s+/g, "").length < 40) {
+    throw new Error("Insufficient text for micro extraction");
   }
+
+  const cleaned = text.replace(/\0/g, " ");
+
+  const findField = (labels: string[]): string | null => {
+    for (const label of labels) {
+      const regex = new RegExp(`${label}\\s*[:\\-]\\s*(.+)`, "i");
+      const match = cleaned.match(regex);
+      if (match?.[1]) {
+        return match[1].split(/\r?\n/)[0]?.trim() ?? null;
+      }
+    }
+    return null;
+  };
+
+  const deadlineConfigs = [
+    { name: "Inspection", keywords: ["inspection response", "inspection deadline", "inspection date"] },
+    { name: "Appraisal", keywords: ["appraisal deadline", "appraisal date"] },
+    { name: "Loan Contingency", keywords: ["loan contingency", "financing contingency", "loan approval"] },
+    { name: "Closing", keywords: ["closing date", "settlement date"] },
+    { name: "Earnest Money", keywords: ["earnest money due", "earnest money deadline"] },
+  ];
+
+  const deadlines = deadlineConfigs
+    .map(({ name, keywords }) => {
+      const date = extractDateByKeywords(cleaned, keywords);
+      if (!date) return null;
+      return { name, date };
+    })
+    .filter(Boolean) as { name: string; date: string | null }[];
+
+  const summaryParagraph =
+    cleaned
+      .split(/\n+/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .slice(0, 6)
+      .join(" ") || "AI parser could not produce a full summary. Please review manually.";
+
+  const risks: { severity: string; description: string }[] = [];
+  if (!deadlines.find((d) => d.name.toLowerCase().includes("inspection"))) {
+    risks.push({ severity: "warning", description: "Inspection date missing or unclear." });
+  }
+  if (!deadlines.find((d) => d.name.toLowerCase().includes("closing"))) {
+    risks.push({ severity: "warning", description: "Closing date missing or unclear." });
+  }
+
+  return {
+    executive_summary: summaryParagraph,
+    parties: {
+      buyer: findField(["Buyer", "Purchaser"]),
+      seller: findField(["Seller", "Owner"]),
+      agents: findField(["Agent", "Broker"]),
+    },
+    deadlines,
+    risks,
+  };
+}
+
+function toTextSnapshot(bytes: Uint8Array): string {
+  const decoder = new TextDecoder("utf-8", { fatal: false });
+  let text = decoder.decode(bytes);
+  if (text.length > MAX_TEXT_SNAPSHOT) {
+    text = text.slice(0, MAX_TEXT_SNAPSHOT);
+  }
+  return text;
+}
+
+function extractDateByKeywords(text: string, keywords: string[]): string | null {
+  for (const keyword of keywords) {
+    const regex = new RegExp(
+      `${keyword}[\\w\\s,:()\\-]{0,80}?((?:\\d{1,2}[\\/\\-]\\d{1,2}[\\/\\-]\\d{2,4})|(?:\\d{4}-\\d{2}-\\d{2})|(?:[A-Za-z]{3,9}\\s+\\d{1,2},\\s+\\d{4}))`,
+      "i"
+    );
+    const match = text.match(regex);
+    if (match?.[1]) {
+      const normalized = normalizeDate(match[1]);
+      if (normalized) return normalized;
+    }
+  }
+  return null;
 }
