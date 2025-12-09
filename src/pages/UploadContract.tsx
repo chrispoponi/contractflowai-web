@@ -147,7 +147,7 @@ export default function UploadContract() {
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json'
         },
-        body: payload
+        body: JSON.stringify(payload)
       })
 
       console.log('📥 contractParsing response:', { data: parseData, error: parseError })
