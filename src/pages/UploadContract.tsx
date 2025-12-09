@@ -1,263 +1,303 @@
-import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
-import { useAuth } from '@/components/providers/AuthProvider'
-import { supabase } from '@/lib/supabase/client'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useToast } from '@/components/ui/use-toast'
-import { Button } from '@/components/ui/button'
-import ContractDeadlines from '@/components/ContractDeadlines'
-import EmailSummaryModal from '@/components/EmailSummaryModal'
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { Navigate, useNavigate } from "react-router-dom";
+import { useAuth } from "@/components/providers/AuthProvider";
+import { supabase } from "@/lib/supabase/client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/components/ui/use-toast";
+import { Button } from "@/components/ui/button";
+import ContractDeadlines from "@/components/ContractDeadlines";
+import EmailSummaryModal from "@/components/EmailSummaryModal";
 
-console.log('🔥 UploadContract LOADED')
+// Debug indicator
+console.log("🔥 UploadContract MOUNTED");
 
-const DEFAULT_STATUSES = {
-  uploaded: 'uploaded',
-  parsingFailed: 'parsed_fallback'
-}
+const DEADLINE_FIELDS = [
+  { key: "inspection_date", label: "Inspection" },
+  { key: "inspection_response_date", label: "Inspection Response" },
+  { key: "appraisal_date", label: "Appraisal" },
+  { key: "loan_contingency_date", label: "Loan Contingency" },
+  { key: "final_walkthrough_date", label: "Final Walkthrough" },
+  { key: "closing_date", label: "Closing" }
+] as const;
 
-const DEADLINE_DEFINITIONS = [
-  { key: 'inspection_date', label: 'Inspection' },
-  { key: 'inspection_response_date', label: 'Inspection Response' },
-  { key: 'appraisal_date', label: 'Appraisal' },
-  { key: 'loan_contingency_date', label: 'Loan Contingency' },
-  { key: 'final_walkthrough_date', label: 'Final Walkthrough' },
-  { key: 'closing_date', label: 'Closing' }
-] as const
-
-type ContractParsingResult = {
-  summary: string
-  deadlines: Record<string, string | null>
-  contractId: string
-}
+export type ContractParsingResult = {
+  summary: string;
+  deadlines: Record<string, string | null>;
+  contractId: string;
+};
 
 type ContractParsingEdgeResponse = ContractParsingResult & {
-  attempts?: unknown
-}
+  attempts?: unknown;
+};
 
 export default function UploadContract() {
-  const { user } = useAuth()
-  const navigate = useNavigate()
-  const { toast } = useToast()
-  const [uploading, setUploading] = useState(false)
-  const [authReady, setAuthReady] = useState(false)
-  const [parsingResult, setParsingResult] = useState<ContractParsingResult | null>(null)
-  const [emailModalOpen, setEmailModalOpen] = useState(false)
-  const [uploadTitle, setUploadTitle] = useState('Contract Timeline')
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
+  const [uploading, setUploading] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
+  const [parsingResult, setParsingResult] = useState<ContractParsingResult | null>(null);
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [uploadTitle, setUploadTitle] = useState("Contract Timeline");
+
+  // Ensure we have an auth session before enabling UI
   useEffect(() => {
-    let mounted = true
-    async function hydrate() {
-      await supabase.auth.getSession()
-      if (mounted) setAuthReady(true)
-    }
-    hydrate()
+    let mounted = true;
+    supabase.auth.getSession().then(() => {
+      if (mounted) setAuthReady(true);
+    });
     return () => {
-      mounted = false
-    }
-  }, [])
+      mounted = false;
+    };
+  }, []);
 
+  // Create simplified list for UI deadline display
   const deadlineList = useMemo(() => {
-    if (!parsingResult) return []
-    return DEADLINE_DEFINITIONS.map(({ key, label }) => {
-      const date = parsingResult.deadlines?.[key] ?? null
-      const completed = Boolean(date && Date.parse(date) < Date.now())
-      return { label, date, completed }
-    })
-  }, [parsingResult])
+    if (!parsingResult) return [];
+    return DEADLINE_FIELDS.map(({ key, label }) => {
+      const date = parsingResult.deadlines[key] ?? null;
+      const completed = Boolean(date && new Date(date) < new Date());
+      return { label, date, completed };
+    });
+  }, [parsingResult]);
 
   if (!authReady) {
     return (
       <div className="flex h-40 items-center justify-center">
         <p className="text-gray-500">Loading account…</p>
       </div>
-    )
+    );
   }
 
-  if (!user) {
-    return <Navigate to="/login" replace />
-  }
+  if (!user) return <Navigate to="/login" replace />;
 
+  // -----------------------------------------------------------------------
+  // HANDLE FILE UPLOAD
+  // -----------------------------------------------------------------------
   async function handleFileSelect(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
-    if (!file) return
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-    setUploading(true)
-    setParsingResult(null)
+    setUploading(true);
+    setParsingResult(null);
 
-    let contractId: string | null = null
+    let contractId: string | null = null;
 
     try {
-      const fileExt = file.name.split('.').pop() || 'pdf'
-      const uniqueId = crypto.randomUUID()
-      const filePath = `${user.id}/${uniqueId}.${fileExt}`
-      const derivedTitle = file.name.replace(/\.[^/.]+$/, '') || 'Contract Timeline'
-      setUploadTitle(derivedTitle)
+      const fileExt = file.name.split(".").pop() || "pdf";
+      const uniqueId = crypto.randomUUID();
+      const filePath = `${user.id}/${uniqueId}.${fileExt}`;
 
-      const { error: uploadError } = await supabase.storage.from('contracts').upload(filePath, file, {
-        upsert: false,
-        cacheControl: '3600',
-        contentType: file.type || 'application/pdf',
-        metadata: { owner: user.id }
-      })
+      setUploadTitle(file.name.replace(/\.[^/.]+$/, "") || "Contract Timeline");
+
+      // Upload file to storage
+      const { error: uploadError } = await supabase.storage
+        .from("contracts")
+        .upload(filePath, file, {
+          upsert: false,
+          contentType: file.type || "application/pdf"
+        });
 
       if (uploadError) {
-        console.error('Upload error:', uploadError)
-        toast({ title: 'Upload failed', description: uploadError.message, variant: 'destructive' })
-        return
+        console.error("❌ Storage upload error:", uploadError);
+        toast({
+          title: "Upload failed",
+          description: uploadError.message,
+          variant: "destructive"
+        });
+        return;
       }
 
-      const { data: contract, error: insertError } = await supabase
-        .from('contracts')
+      // Insert DB record
+      const { data: inserted, error: insertError } = await supabase
+        .from("contracts")
         .insert({
           user_id: user.id,
           contract_file_url: filePath,
-          status: 'under_contract'
+          status: "uploaded"
         })
         .select()
-        .single()
+        .single();
 
-      if (insertError || !contract) {
-        console.error('Contract insert error:', insertError)
-        toast({ title: 'Upload failed', description: 'Unable to create contract record.', variant: 'destructive' })
-        return
+      if (insertError || !inserted) {
+        console.error("❌ Insert error:", insertError);
+        toast({
+          title: "Upload failed",
+          description: "Could not create contract record.",
+          variant: "destructive"
+        });
+        return;
       }
 
-      contractId = contract.id
-      toast({ title: 'Uploaded', description: 'Parsing…' })
+      contractId = inserted.id;
 
-      const { data: sessionData } = await supabase.auth.getSession()
-      const accessToken = sessionData?.session?.access_token
-      if (!accessToken) {
-        console.error('Missing access token.')
-        toast({ title: 'Auth error', description: 'Please log in again.', variant: 'destructive' })
-        return
+      toast({ title: "Uploaded", description: "Parsing contract…" });
+
+      // Get session token
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+
+      if (!token) {
+        console.error("❌ No access token found.");
+        toast({
+          title: "Auth error",
+          description: "Please log in again.",
+          variant: "destructive"
+        });
+        return;
       }
 
       const payload = {
         storagePath: filePath,
         userId: user.id,
-        contractId: contract.id,
+        contractId,
         persist: true
-      }
+      };
 
-      console.log('📤 Invoking contractParsing with:', payload)
+      console.log("📤 Sending payload to edge:", JSON.stringify(payload, null, 2));
 
-      const { data: parseData, error: parseError } = await supabase.functions.invoke<ContractParsingEdgeResponse>('contractParsing', {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      })
+      // IMPORTANT: JSON.stringify REQUIRED
+      const { data: parseData, error: parseError } =
+        await supabase.functions.invoke<ContractParsingEdgeResponse>("contractParsing", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        });
 
-      console.log('📥 contractParsing response:', { data: parseData, error: parseError })
-
-      const session = await supabase.auth.getSession()
-      console.log('👤 Current session:', session)
+      console.log("📥 Edge response:", parseData, parseError);
 
       if (parseError) {
-        console.error('Parse error:', parseError)
-        await supabase
-          .from('contracts')
-          .update({ status: DEFAULT_STATUSES.parsingFailed })
-          .eq('id', contract.id)
-          .eq('user_id', user.id)
-        toast({ title: 'Parsing failed', description: 'Our team was notified.', variant: 'destructive' })
-        return
+        console.error("❌ Parse error:", parseError);
+        toast({
+          title: "Parsing failed",
+          description: "Our team has been notified.",
+          variant: "destructive"
+        });
+        return;
       }
 
-      if (!parseData || typeof parseData !== 'object') {
-        throw new Error('Parsing response missing data payload.')
+      if (!parseData) {
+        throw new Error("Edge function returned empty payload.");
       }
 
+      // Store UI result
       setParsingResult({
-        summary: typeof parseData.summary === 'string' ? parseData.summary : 'Summary pending manual review.',
-        deadlines: (parseData.deadlines as Record<string, string | null>) ?? {},
-        contractId: parseData.contractId ?? contract.id
-      })
+        summary: parseData.summary,
+        deadlines: parseData.deadlines,
+        contractId: parseData.contractId
+      });
 
-      console.log('Parsing complete:', parseData)
-      toast({ title: 'Contract parsed', description: 'Successfully processed!' })
-    } catch (error) {
-      console.error('Unexpected error:', error)
-      toast({ title: 'Upload failed', description: 'Something went wrong.', variant: 'destructive' })
-      if (contractId) {
-        await supabase
-          .from('contracts')
-          .update({ status: DEFAULT_STATUSES.parsingFailed })
-          .eq('id', contractId)
-          .eq('user_id', user.id)
-      }
+      toast({
+        title: "Contract parsed",
+        description: "Review your summary below."
+      });
+    } catch (err) {
+      console.error("🔥 Unexpected error:", err);
+      toast({
+        title: "Upload failed",
+        description: "Something went wrong.",
+        variant: "destructive"
+      });
     } finally {
-      setUploading(false)
+      setUploading(false);
     }
   }
 
-  const formatICSDate = (date: Date) => {
-    return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
+  // -----------------------------------------------------------------------
+  // CALENDAR EXPORT
+  // -----------------------------------------------------------------------
+  function formatICSDate(date: Date) {
+    return date.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
   }
 
-  const handleCalendarDownload = () => {
-    if (!parsingResult) return
-    const now = new Date()
+  function handleCalendarDownload() {
+    if (!parsingResult) return;
 
-    const icsLines = [
-      'BEGIN:VCALENDAR',
-      'VERSION:2.0',
-      'PRODID:-//ContractFlowAI//EN'
-    ]
+    const now = new Date();
+    const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//ContractFlowAI//EN"];
 
-    DEADLINE_DEFINITIONS.forEach(({ key, label }) => {
-      const date = parsingResult.deadlines?.[key]
-      if (!date) return
-      const normalized = date.replace(/-/g, '')
-      icsLines.push('BEGIN:VEVENT')
-      icsLines.push(`UID:${parsingResult.contractId}-${key}@contractflowai`)
-      icsLines.push(`DTSTAMP:${formatICSDate(now)}`)
-      icsLines.push(`SUMMARY:${label} - ${uploadTitle}`)
-      icsLines.push(`DTSTART;VALUE=DATE:${normalized}`)
-      icsLines.push('DURATION:P1D')
-      icsLines.push('END:VEVENT')
-    })
+    DEADLINE_FIELDS.forEach(({ key, label }) => {
+      const date = parsingResult.deadlines[key];
+      if (!date) return;
 
-    icsLines.push('END:VCALENDAR')
+      const normalized = date.replace(/-/g, "");
+      ics.push("BEGIN:VEVENT");
+      ics.push(`UID:${parsingResult.contractId}-${key}@contractflowai`);
+      ics.push(`DTSTAMP:${formatICSDate(now)}`);
+      ics.push(`SUMMARY:${label} - ${uploadTitle}`);
+      ics.push(`DTSTART;VALUE=DATE:${normalized}`);
+      ics.push("DURATION:P1D");
+      ics.push("END:VEVENT");
+    });
 
-    const blob = new Blob([icsLines.join('\r\n')], { type: 'text/calendar;charset=utf-8' })
-    const link = document.createElement('a')
-    link.href = URL.createObjectURL(blob)
-    link.download = `${uploadTitle.replace(/\s+/g, '_')}_deadlines.ics`
-    link.click()
-    URL.revokeObjectURL(link.href)
+    ics.push("END:VCALENDAR");
+
+    const blob = new Blob([ics.join("\r\n")], {
+      type: "text/calendar;charset=utf-8"
+    });
+
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `${uploadTitle.replace(/\s+/g, "_")}_deadlines.ics`;
+    link.click();
+    URL.revokeObjectURL(link.href);
   }
 
+  // -----------------------------------------------------------------------
+  // UI RENDER
+  // -----------------------------------------------------------------------
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-8 px-4">
       <Card className="rounded-lg border bg-white p-6 shadow-md">
         <CardHeader>
           <CardTitle>AI Contract Upload</CardTitle>
         </CardHeader>
+
         <CardContent>
           <label className="block w-full cursor-pointer rounded-md border-2 border-dashed p-10 text-center text-gray-600 hover:bg-gray-50">
-            {uploading ? 'Uploading…' : 'Click to choose a contract'}
-            <input type="file" accept=".pdf,.eml,.msg" className="hidden" onChange={handleFileSelect} disabled={uploading} />
+            {uploading ? "Uploading…" : "Click to choose a contract"}
+            <input
+              type="file"
+              accept=".pdf,.eml,.msg"
+              className="hidden"
+              onChange={handleFileSelect}
+              disabled={uploading}
+            />
           </label>
         </CardContent>
       </Card>
 
       {parsingResult && (
-        <div className="space-y-6">
+        <>
           <Card className="border bg-white shadow-lg">
             <CardHeader>
               <CardTitle>AI Summary</CardTitle>
             </CardHeader>
+
             <CardContent className="space-y-4">
-              <p className="text-base leading-relaxed text-slate-700">{parsingResult.summary}</p>
+              <p className="text-base leading-relaxed text-slate-700">
+                {parsingResult.summary}
+              </p>
+
               <div className="flex flex-wrap gap-3">
-                <Button onClick={() => setEmailModalOpen(true)}>Send summary via email</Button>
+                <Button onClick={() => setEmailModalOpen(true)}>
+                  Send summary via email
+                </Button>
+
                 <Button variant="outline" onClick={handleCalendarDownload}>
                   Add to calendar
                 </Button>
-                <Button variant="ghost" onClick={() => navigate(`/contracts/${parsingResult.contractId}`)}>
+
+                <Button
+                  variant="ghost"
+                  onClick={() =>
+                    navigate(`/contracts/${parsingResult.contractId}`)
+                  }
+                >
                   View contract
                 </Button>
               </div>
@@ -268,21 +308,20 @@ export default function UploadContract() {
             <CardHeader>
               <CardTitle>Deadlines</CardTitle>
             </CardHeader>
+
             <CardContent>
               <ContractDeadlines deadlines={deadlineList} />
             </CardContent>
           </Card>
-        </div>
-      )}
 
-      {parsingResult && (
-        <EmailSummaryModal
-          open={emailModalOpen}
-          onClose={() => setEmailModalOpen(false)}
-          summary={parsingResult.summary}
-          contractId={parsingResult.contractId}
-        />
+          <EmailSummaryModal
+            open={emailModalOpen}
+            onClose={() => setEmailModalOpen(false)}
+            summary={parsingResult.summary}
+            contractId={parsingResult.contractId}
+          />
+        </>
       )}
     </div>
-  )
+  );
 }
