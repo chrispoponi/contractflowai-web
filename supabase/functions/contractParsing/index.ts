@@ -100,11 +100,26 @@ serve(async (req) => {
     console.log("📥 Incoming payload:", body);
 
     const { contractId, storagePath, userId } = body;
+    console.log("🧪 Validating:", {
+      contractId,
+      userId,
+      storagePath,
+      types: {
+        contractId: typeof contractId,
+        userId: typeof userId,
+        storagePath: typeof storagePath,
+      },
+    });
     requestContractId = contractId ?? null;
     requestStoragePath = storagePath ?? null;
     requestUserId = userId ?? null;
 
-    if (!storagePath || !userId || !contractId) {
+    if (
+      !storagePath || typeof storagePath !== "string" || storagePath.trim().length === 0 ||
+      !userId || typeof userId !== "string" || userId.trim().length === 0 ||
+      !contractId || typeof contractId !== "string" || contractId.trim().length === 0
+    ) {
+      console.log("❌ Validation failed:", { contractId, userId, storagePath });
       return new Response(
         JSON.stringify({ error: "storagePath, contractId, and userId required" }),
         { status: 400, headers: corsHeaders }
