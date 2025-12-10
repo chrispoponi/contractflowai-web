@@ -21,8 +21,8 @@ const DEADLINE_FIELDS = [
 ] as const;
 
 export type ContractParsingResult = {
-  summary: string;
-  deadlines?: Record<string, string | null>;
+  summary?: string | null;
+  deadlines?: Record<string, string | null> | null;
   contractId: string;
 };
 
@@ -280,7 +280,7 @@ export default function UploadContract() {
 
             <CardContent className="space-y-4">
               <p className="text-base leading-relaxed text-slate-700">
-                {parsingResult.summary}
+                {parsingResult.summary?.trim() || "No summary generated yet."}
               </p>
 
               <div className="flex flex-wrap gap-3">
@@ -317,7 +317,7 @@ export default function UploadContract() {
           <EmailSummaryModal
             open={emailModalOpen}
             onClose={() => setEmailModalOpen(false)}
-            summary={parsingResult.summary}
+            summary={parsingResult.summary?.trim() || "No summary generated yet."}
             contractId={parsingResult.contractId}
           />
         </>
