@@ -15,6 +15,7 @@ import TransactionChecklist, { ChecklistField } from '@/components/contracts/Tra
 import ContractDeadlines from '@/components/ContractDeadlines'
 import { Separator } from '@/components/ui/separator'
 import { FileText, Loader2 } from 'lucide-react'
+import { CalendarContract, handleCalendarDownload } from '@/utils/calendar'
 import { fetchContract, listCounterOffers, updateContract as updateContractRecord } from '@/lib/supabase/queries/contracts'
 
 const statusColors: Record<string, string> = {
@@ -168,14 +169,26 @@ export default function ContractDetails() {
     })
   }, [contract])
 
-  const summaryText =
-    contract?.plain_language_summary ??
-    contract?.ai_summary ??
-    parsedSummary?.executive_summary ??
-    'No summary available.'
+const summaryText =
+  contract?.plain_language_summary ??
+  contract?.ai_summary ??
+  parsedSummary?.executive_summary ??
+  'No summary available.'
 
-  const displayTitle = contract?.title ?? contract?.property_address ?? `Contract ${contract?.id ?? ''}`
-  const displayClient = contract?.buyer_name ?? contract?.seller_name ?? 'N/A'
+const displayTitle = contract?.title ?? contract?.property_address ?? `Contract ${contract?.id ?? ''}`
+const displayClient = contract?.buyer_name ?? contract?.seller_name ?? 'N/A'
+
+const calendarContract: CalendarContract | null = contract
+  ? {
+      id: contract.id,
+      title: displayTitle,
+      propertyAddress: contract.property_address ?? null,
+      summary: summaryText,
+      deadlines: deadlineList.map(({ label, date }) => ({ label, date }))
+    }
+  : null
+
+const canDownloadCalendar = Boolean(calendarContract?.deadlines?.some((deadline) => !!deadline.date))
 
   if (isLoading) {
     return (
@@ -257,6 +270,17 @@ export default function ContractDetails() {
           <div>
             <p className="text-xs uppercase tracking-wide text-slate-500">Summary</p>
             <p className="text-base text-slate-900 whitespace-pre-wrap">{summaryText}</p>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => calendarContract && handleCalendarDownload(calendarContract)}
+              disabled={!canDownloadCalendar}
+            >
+              Download .ics
+            </Button>
           </div>
 
           {summaryLoading && <p className="text-sm text-slate-500">Loading detailed summary…</p>}

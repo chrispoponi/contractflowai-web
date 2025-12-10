@@ -1,12 +1,13 @@
-import { useEffect, useState, type ChangeEvent } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
-import { useAuth } from "@/components/providers/AuthProvider";
-import { supabase } from "@/lib/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/components/ui/use-toast";
-import { Button } from "@/components/ui/button";
-import ContractDeadlines from "@/components/ContractDeadlines";
-import EmailSummaryModal from "@/components/EmailSummaryModal";
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
+import { Navigate, useNavigate } from 'react-router-dom'
+import { useAuth } from '@/components/providers/AuthProvider'
+import { supabase } from '@/lib/supabase/client'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useToast } from '@/components/ui/use-toast'
+import { Button } from '@/components/ui/button'
+import ContractDeadlines from '@/components/ContractDeadlines'
+import EmailSummaryModal from '@/components/EmailSummaryModal'
+import { CalendarContract, handleCalendarDownload } from '@/utils/calendar'
 
 type ParsedDeadline = {
   label: string;
@@ -35,10 +36,12 @@ type ExtractedContract = {
 };
 
 type ParsingPreview = {
-  summary: string;
-  deadlines: { label: string; date: string | null; completed: boolean }[];
-  contractId: string;
-};
+  summary: string
+  deadlines: { label: string; date: string | null; completed: boolean }[]
+  contractId: string
+  propertyAddress?: string | null
+  title?: string | null
+}
 
 const DEADLINE_FIELDS: ParsedDeadline[] = [
   { key: "contract_date", label: "Contract Date", completed: false },
@@ -68,6 +71,20 @@ export default function UploadContract() {
   const [parsingResult, setParsingResult] = useState<ParsingPreview | null>(null);
   const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [uploadTitle, setUploadTitle] = useState("Contract Timeline");
+
+  const calendarContract = useMemo<CalendarContract | null>(() => {
+    if (!parsingResult) return null;
+    return {
+      id: parsingResult.contractId,
+      title: parsingResult.title || uploadTitle,
+      propertyAddress: parsingResult.propertyAddress || undefined,
+      summary: parsingResult.summary,
+      deadlines: parsingResult.deadlines.map(({ label, date }) => ({ label, date })),
+    };
+  }, [parsingResult, uploadTitle]);
+
+  const canDownloadCalendar =
+    !!calendarContract?.deadlines?.some((deadline) => !!deadline.date);
 
   useEffect(() => {
     let mounted = true;
@@ -160,12 +177,15 @@ export default function UploadContract() {
       }
 
       const payload = await response.json();
-      const extracted = (payload?.extracted || {}) as ExtractedContract;
+      const extracted = (payload?.extracted ?? {}) as ExtractedContract;
+      const deadlines = buildDeadlines(extracted);
 
       setParsingResult({
-        summary: extracted.plain_language_summary || "No summary provided.",
-        deadlines: buildDeadlines(extracted),
+        summary: extracted.plain_language_summary || 'No summary provided.',
+        deadlines,
         contractId: payload?.contractId ?? contractId,
+        propertyAddress: extracted.property_address ?? null,
+        title: extracted.property_address ?? uploadTitle
       });
 
       toast({
@@ -220,12 +240,12 @@ export default function UploadContract() {
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() =>
-                    console.log(
-                      "Calendar download placeholder — waiting for ICS generator."
-                    )
-                  }
-                  disabled={!parsingResult.deadlines.some((deadline) => !!deadline.date)}
+                  onClick={() => {
+                    if (calendarContract) {
+                      handleCalendarDownload(calendarContract);
+                    }
+                  }}
+                  disabled={!canDownloadCalendar}
                 >
                   Download .ics
                 </Button>
