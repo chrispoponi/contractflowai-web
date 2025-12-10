@@ -22,7 +22,7 @@ const DEADLINE_FIELDS = [
 
 export type ContractParsingResult = {
   summary: string;
-  deadlines: Record<string, string | null>;
+  deadlines?: Record<string, string | null>;
   contractId: string;
 };
 
@@ -54,9 +54,9 @@ export default function UploadContract() {
 
   // Create simplified list for UI deadline display
   const deadlineList = useMemo(() => {
-    if (!parsingResult) return [];
+    const deadlines = parsingResult?.deadlines ?? {};
     return DEADLINE_FIELDS.map(({ key, label }) => {
-      const date = parsingResult.deadlines[key] ?? null;
+      const date = deadlines?.[key] ?? null;
       const completed = Boolean(date && new Date(date) < new Date());
       return { label, date, completed };
     });
@@ -187,7 +187,7 @@ export default function UploadContract() {
       // Store UI result
       setParsingResult({
         summary: parseData.summary,
-        deadlines: parseData.deadlines,
+        deadlines: parseData.deadlines ?? {},
         contractId: parseData.contractId
       });
 
@@ -215,13 +215,13 @@ export default function UploadContract() {
   }
 
   function handleCalendarDownload() {
-    if (!parsingResult) return;
+    if (!parsingResult?.deadlines) return;
 
     const now = new Date();
     const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//ContractFlowAI//EN"];
 
     DEADLINE_FIELDS.forEach(({ key, label }) => {
-      const date = parsingResult.deadlines[key];
+      const date = parsingResult.deadlines?.[key];
       if (!date) return;
 
       const normalized = date.replace(/-/g, "");
