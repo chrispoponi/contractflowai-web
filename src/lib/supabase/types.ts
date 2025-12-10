@@ -76,7 +76,10 @@ export type Database = {
           purchase_price: number | null
           earnest_money: number | null
           agent_notes: string | null
+          plain_language_summary: string | null
           contract_file_url: string | null
+          summary_path: string | null
+          counter_offer_path: string | null
           inspection_completed: boolean | null
           inspection_response_completed: boolean | null
           appraisal_completed: boolean | null

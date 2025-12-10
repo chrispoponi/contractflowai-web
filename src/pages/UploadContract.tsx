@@ -185,10 +185,15 @@ export default function UploadContract() {
       }
 
       // Store UI result
+      const resolvedContractId =
+        parseData.contractId ??
+        (parseData as Record<string, string | null>)?.id ??
+        contractId;
+
       setParsingResult({
-        summary: parseData.summary,
+        summary: parseData.summary ?? null,
         deadlines: parseData.deadlines ?? {},
-        contractId: parseData.contractId
+        contractId: resolvedContractId
       });
 
       toast({
@@ -294,9 +299,11 @@ export default function UploadContract() {
 
                 <Button
                   variant="ghost"
-                  onClick={() =>
+                  disabled={!parsingResult.contractId}
+                  onClick={() => {
+                    if (!parsingResult.contractId) return
                     navigate(`/contracts/${parsingResult.contractId}`)
-                  }
+                  }}
                 >
                   View contract
                 </Button>
@@ -318,7 +325,7 @@ export default function UploadContract() {
             open={emailModalOpen}
             onClose={() => setEmailModalOpen(false)}
             summary={parsingResult.summary?.trim() || "No summary generated yet."}
-            contractId={parsingResult.contractId}
+            contractId={parsingResult.contractId ?? ''}
           />
         </>
       )}

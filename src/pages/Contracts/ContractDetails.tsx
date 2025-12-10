@@ -11,9 +11,10 @@ import { useToast } from '@/components/ui/use-toast'
 import EditContractModal from '@/components/contracts/EditContractModal'
 import UploadCounterOfferModal from '@/components/contracts/UploadCounterOfferModal'
 import CancelContractModal from '@/components/contracts/CancelContractModal'
-import TransactionChecklist from '@/components/contracts/TransactionChecklist'
+import TransactionChecklist, { ChecklistField } from '@/components/contracts/TransactionChecklist'
+import ContractDeadlines from '@/components/ContractDeadlines'
 import { Separator } from '@/components/ui/separator'
-import { ExternalLink, FileText, Loader2 } from 'lucide-react'
+import { FileText, Loader2 } from 'lucide-react'
 import { fetchContract, listCounterOffers, updateContract as updateContractRecord } from '@/lib/supabase/queries/contracts'
 
 const statusColors: Record<string, string> = {
@@ -46,7 +47,14 @@ type ParsedSummary = {
 
 type Contract = Tables<'contracts'>
 
-type TimelineRecord = Record<string, boolean>
+const DEADLINE_FIELDS = [
+  { label: 'Inspection', dateField: 'inspection_date', completedField: 'inspection_completed' },
+  { label: 'Inspection Response', dateField: 'inspection_response_date', completedField: 'inspection_response_completed' },
+  { label: 'Appraisal', dateField: 'appraisal_date', completedField: 'appraisal_completed' },
+  { label: 'Loan Contingency', dateField: 'loan_contingency_date', completedField: 'loan_contingency_completed' },
+  { label: 'Final Walkthrough', dateField: 'final_walkthrough_date', completedField: 'final_walkthrough_completed' },
+  { label: 'Closing', dateField: 'closing_date', completedField: 'closing_completed' }
+] as const
 
 export default function ContractDetails() {
   const { contractId } = useParams<{ contractId: string }>()
@@ -75,7 +83,7 @@ export default function ContractDetails() {
   })
 
   const updateMutation = useMutation({
-    mutationFn: async (updates: TablesUpdate<'contracts'>) => {
+    mutationFn: async (updates: Partial<Contract>) => {
       if (!contractId) return
       await updateContractRecord(contractId, { ...updates, updated_at: new Date().toISOString() })
     },
@@ -94,11 +102,9 @@ export default function ContractDetails() {
   const cancelMutation = useMutation({
     mutationFn: async ({ reason, notes }: { reason: string; notes: string }) => {
       if (!contractId) return
-      const timeline = (contract?.timeline as TimelineRecord | null) ?? {}
-      timeline[`cancel_${Date.now()}`] = true
       const { error } = await supabase
         .from('contracts')
-        .update({ status: 'cancelled', ai_summary: `${contract?.ai_summary ?? ''}\nCancelled: ${reason} - ${notes}`, timeline })
+        .update({ status: 'cancelled', ai_summary: `${contract?.ai_summary ?? ''}\nCancelled: ${reason} - ${notes}` })
         .eq('id', contractId)
       if (error) throw error
     },
@@ -112,8 +118,8 @@ export default function ContractDetails() {
   })
 
   const handleDownload = async () => {
-    if (!contract?.storage_path) return
-    const { data, error } = await supabase.storage.from('contracts').createSignedUrl(contract.storage_path, 60)
+    if (!contract?.contract_file_url) return
+    const { data, error } = await supabase.storage.from('contracts').createSignedUrl(contract.contract_file_url, 60)
     if (error || !data?.signedUrl) {
       toast({ title: 'Unable to create download link', variant: 'destructive' })
       return
@@ -121,16 +127,9 @@ export default function ContractDetails() {
     window.open(data.signedUrl, '_blank')
   }
 
-  const handleTimelineToggle = async (taskId: string, nextValue: boolean) => {
-    const timeline = { ...(((contract?.timeline ?? {}) as TimelineRecord) ?? {}) }
-    timeline[taskId] = nextValue
-    await updateMutation.mutateAsync({ timeline })
+  const handleChecklistToggle = async (field: ChecklistField, nextValue: boolean) => {
+    await updateMutation.mutateAsync({ [field]: nextValue } as Partial<Contract>)
   }
-
-  const timelineItems = useMemo(() => {
-    if (!contract?.timeline) return []
-    return Object.entries(contract.timeline as Record<string, unknown>)
-  }, [contract?.timeline])
 
   const summaryPath = contract?.summary_path
   const metadataPath = summaryPath ? summaryPath.replace('summary.json', 'metadata.json') : null
@@ -159,6 +158,25 @@ export default function ContractDetails() {
     }
   })
 
+  const deadlineList = useMemo(() => {
+    if (!contract) return []
+
+    return DEADLINE_FIELDS.map(({ label, dateField, completedField }) => {
+      const date = contract[dateField as keyof Contract] as string | null
+      const completed = Boolean(contract[completedField as keyof Contract])
+      return { label, date, completed }
+    })
+  }, [contract])
+
+  const summaryText =
+    contract?.plain_language_summary ??
+    contract?.ai_summary ??
+    parsedSummary?.executive_summary ??
+    'No summary available.'
+
+  const displayTitle = contract?.title ?? contract?.property_address ?? `Contract ${contract?.id ?? ''}`
+  const displayClient = contract?.buyer_name ?? contract?.seller_name ?? 'N/A'
+
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -176,8 +194,8 @@ export default function ContractDetails() {
       <Card>
         <CardHeader className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <CardTitle className="text-2xl font-semibold text-slate-900">{contract.title}</CardTitle>
-            <p className="text-sm text-slate-500">{contract.property_address}</p>
+            <CardTitle className="text-2xl font-semibold text-slate-900">{displayTitle}</CardTitle>
+            <p className="text-sm text-slate-500">{contract.property_address ?? 'Address not provided'}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Badge className={statusColors[contract.status] ?? 'bg-slate-100 text-slate-700'}>{contract.status.replace('_', ' ')}</Badge>
@@ -196,7 +214,7 @@ export default function ContractDetails() {
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <p className="text-xs uppercase tracking-wide text-slate-500">Client</p>
-              <p className="text-base font-medium text-slate-900">{contract.client_name ?? 'N/A'}</p>
+              <p className="text-base font-medium text-slate-900">{displayClient}</p>
             </div>
             <div>
               <p className="text-xs uppercase tracking-wide text-slate-500">Closing date</p>
@@ -205,39 +223,21 @@ export default function ContractDetails() {
           </div>
           <Separator />
           <div className="flex flex-wrap gap-3">
-            <Button variant="outline" size="sm" onClick={handleDownload} disabled={!contract.storage_path}>
+            <Button variant="outline" size="sm" onClick={handleDownload} disabled={!contract.contract_file_url}>
               <FileText className="mr-2 h-4 w-4" /> Download original
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                void supabase.functions
-                  .invoke('generateClientTimeline', { body: { contractId: contract.id, userId: user?.id } })
-                  .then(() => toast({ title: 'Timeline requested' }))
-                  .catch((error) => toast({ title: 'Timeline error', description: error.message, variant: 'destructive' }))
-              }}
-            >
-              <ExternalLink className="mr-2 h-4 w-4" /> Regenerate timeline
             </Button>
           </div>
         </CardContent>
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <TransactionChecklist contract={contract} onToggle={handleTimelineToggle} />
+        <TransactionChecklist contract={contract} onToggle={handleChecklistToggle} />
         <Card>
           <CardHeader>
-            <CardTitle>Activity</CardTitle>
+            <CardTitle>Deadlines</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {timelineItems.length === 0 && <p className="text-sm text-slate-500">No timeline events tracked yet.</p>}
-            {timelineItems.map(([key, value]) => (
-              <div key={key} className="rounded-xl border border-slate-200 p-3 text-sm">
-                <p className="font-medium text-slate-900">{key}</p>
-                <p className="text-slate-500">{String(value)}</p>
-              </div>
-            ))}
+          <CardContent>
+            <ContractDeadlines deadlines={deadlineList} />
           </CardContent>
         </Card>
       </div>
@@ -254,16 +254,18 @@ export default function ContractDetails() {
           )}
         </CardHeader>
         <CardContent className="space-y-4">
-          {summaryLoading && <p className="text-sm text-slate-500">Loading summary…</p>}
+          <div>
+            <p className="text-xs uppercase tracking-wide text-slate-500">Summary</p>
+            <p className="text-base text-slate-900 whitespace-pre-wrap">{summaryText}</p>
+          </div>
+
+          {summaryLoading && <p className="text-sm text-slate-500">Loading detailed summary…</p>}
           {!summaryLoading && !parsedSummary && (
-            <p className="text-sm text-slate-500">No AI summary available yet. Upload a contract to generate one.</p>
+            <p className="text-sm text-slate-500">No additional AI insights available yet.</p>
           )}
+
           {parsedSummary && (
             <>
-              <div>
-                <p className="text-xs uppercase tracking-wide text-slate-500">Executive summary</p>
-                <p className="text-base text-slate-900">{parsedSummary.executive_summary ?? 'Not provided.'}</p>
-              </div>
               <div className="grid gap-4 md:grid-cols-3">
                 <div>
                   <p className="text-xs uppercase tracking-wide text-slate-500">Buyer</p>
