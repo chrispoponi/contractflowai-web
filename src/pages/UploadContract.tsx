@@ -220,7 +220,11 @@ export default function UploadContract() {
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={handleCalendarDownload}
+                  onClick={() =>
+                    console.log(
+                      "Calendar download placeholder — waiting for ICS generator."
+                    )
+                  }
                   disabled={!parsingResult.deadlines.some((deadline) => !!deadline.date)}
                 >
                   Download .ics
