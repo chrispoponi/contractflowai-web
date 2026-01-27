@@ -6,21 +6,101 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Save, X } from "lucide-react";
+import { AlertCircle, Save, X, AlertTriangle, Calendar, CheckCircle2 } from "lucide-react";
 
-export default function ContractForm({ initialData, onSave, onCancel }) {
-  const [formData, setFormData] = useState(initialData || {});
-  const [errors, setErrors] = useState({});
+type ContractFormData = {
+  property_address?: string;
+  representing_side?: string;
+  status?: string;
+  buyer_name?: string;
+  buyer_email?: string;
+  buyer_phone?: string;
+  seller_name?: string;
+  seller_email?: string;
+  seller_phone?: string;
+  purchase_price?: number | string;
+  earnest_money?: number | string;
+  contract_date?: string;
+  closing_date?: string;
+  inspection_date?: string;
+  inspection_response_date?: string;
+  loan_contingency_date?: string;
+  appraisal_date?: string;
+  final_walkthrough_date?: string;
+  plain_language_summary?: string;
+  agent_notes?: string;
+  _uncertain_fields?: string[];
+};
 
-  const handleChange = (field, value) => {
+type ContractFormProps = {
+  initialData?: ContractFormData;
+  onSave: (data: ContractFormData) => void;
+  onCancel: () => void;
+};
+
+type DateField = {
+  key: keyof ContractFormData;
+  label: string;
+};
+
+export default function ContractForm({ initialData, onSave, onCancel }: ContractFormProps) {
+  const [formData, setFormData] = useState<ContractFormData>(initialData || {});
+  const [errors, setErrors] = useState<Record<string, string | null>>({});
+  const [showDateConfirmation, setShowDateConfirmation] = useState(false);
+  
+  // Track uncertain fields - starts from AI extraction, cleared when user edits
+  const [uncertainFields, setUncertainFields] = useState<string[]>(initialData?._uncertain_fields || []);
+  
+  // Track which fields user has manually verified/edited
+  const [verifiedFields, setVerifiedFields] = useState<string[]>([]);
+  
+  // Define all date fields for checking
+  const dateFields: DateField[] = [
+    { key: 'contract_date', label: 'Contract Date' },
+    { key: 'closing_date', label: 'Closing Date' },
+    { key: 'inspection_date', label: 'Inspection Date' },
+    { key: 'inspection_response_date', label: 'Inspection Response Date' },
+    { key: 'loan_contingency_date', label: 'Loan Contingency Date' },
+    { key: 'appraisal_date', label: 'Appraisal Date' },
+    { key: 'final_walkthrough_date', label: 'Final Walkthrough Date' }
+  ];
+  
+  // Check which dates are missing (not verified by user)
+  const getMissingOrUncertainDates = () => {
+    return dateFields.filter(({ key }) => 
+      !formData[key] || (uncertainFields.includes(key as string) && !verifiedFields.includes(key as string))
+    );
+  };
+  
+  // Check if a field needs attention (missing or uncertain and not yet verified by user)
+  const needsAttention = (fieldKey: string): boolean => {
+    if (verifiedFields.includes(fieldKey)) return false;
+    return !formData[fieldKey as keyof ContractFormData] || uncertainFields.includes(fieldKey);
+  };
+  
+  // Check if a field was marked as uncertain by AI (and not yet verified)
+  const isUncertain = (fieldKey: string): boolean => {
+    if (verifiedFields.includes(fieldKey)) return false;
+    return uncertainFields.includes(fieldKey);
+  };
+
+  const handleChange = (field: keyof ContractFormData, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: null }));
     }
+    
+    // When user edits a date field, mark it as verified (user has reviewed it)
+    const dateFieldKeys = dateFields.map(d => d.key as string);
+    if (dateFieldKeys.includes(field as string) && value) {
+      // Remove from uncertain and add to verified
+      setUncertainFields(prev => prev.filter(f => f !== field));
+      setVerifiedFields(prev => prev.includes(field as string) ? prev : [...prev, field as string]);
+    }
   };
 
   const validateForm = () => {
-    const newErrors = {};
+    const newErrors: Record<string, string | null> = {};
     
     if (!formData.property_address) {
       newErrors.property_address = "Property address is required";
@@ -34,12 +114,23 @@ export default function ContractForm({ initialData, onSave, onCancel }) {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     if (validateForm()) {
-      onSave(formData);
+      // Check if there are uncertain or missing dates that need confirmation
+      const problemDates = getMissingOrUncertainDates();
+      if (problemDates.length > 0) {
+        setShowDateConfirmation(true);
+      } else {
+        onSave(formData);
+      }
     }
+  };
+  
+  const handleConfirmSave = () => {
+    setShowDateConfirmation(false);
+    onSave(formData);
   };
 
   return (
@@ -201,71 +292,53 @@ export default function ContractForm({ initialData, onSave, onCancel }) {
           </div>
 
           <div className="border-t pt-6">
-            <h3 className="font-semibold text-gray-900 mb-4">Important Dates</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-[#1e3a5f]" />
+                Important Dates
+              </h3>
+              {getMissingOrUncertainDates().length > 0 && (
+                <span className="text-sm text-amber-600 flex items-center gap-1">
+                  <AlertTriangle className="w-4 h-4" />
+                  {getMissingOrUncertainDates().length} date(s) need verification
+                </span>
+              )}
+            </div>
+            
+            {/* Alert for uncertain/missing dates */}
+            {getMissingOrUncertainDates().length > 0 && (
+              <Alert className="mb-4 border-amber-200 bg-amber-50">
+                <AlertTriangle className="w-4 h-4 text-amber-600" />
+                <AlertDescription className="text-amber-800">
+                  <strong>Please verify highlighted dates:</strong> Some dates could not be confidently extracted from the PDF. 
+                  Fields marked with a yellow border need your attention.
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="contract_date">Contract Date</Label>
-                <Input
-                  id="contract_date"
-                  type="date"
-                  value={formData.contract_date || ""}
-                  onChange={(e) => handleChange("contract_date", e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="closing_date">Closing Date</Label>
-                <Input
-                  id="closing_date"
-                  type="date"
-                  value={formData.closing_date || ""}
-                  onChange={(e) => handleChange("closing_date", e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="inspection_date">Inspection Date</Label>
-                <Input
-                  id="inspection_date"
-                  type="date"
-                  value={formData.inspection_date || ""}
-                  onChange={(e) => handleChange("inspection_date", e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="inspection_response_date">Inspection Response Date</Label>
-                <Input
-                  id="inspection_response_date"
-                  type="date"
-                  value={formData.inspection_response_date || ""}
-                  onChange={(e) => handleChange("inspection_response_date", e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="loan_contingency_date">Loan Contingency Date</Label>
-                <Input
-                  id="loan_contingency_date"
-                  type="date"
-                  value={formData.loan_contingency_date || ""}
-                  onChange={(e) => handleChange("loan_contingency_date", e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="appraisal_date">Appraisal Date</Label>
-                <Input
-                  id="appraisal_date"
-                  type="date"
-                  value={formData.appraisal_date || ""}
-                  onChange={(e) => handleChange("appraisal_date", e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="final_walkthrough_date">Final Walkthrough Date</Label>
-                <Input
-                  id="final_walkthrough_date"
-                  type="date"
-                  value={formData.final_walkthrough_date || ""}
-                  onChange={(e) => handleChange("final_walkthrough_date", e.target.value)}
-                />
-              </div>
+              {dateFields.map(({ key, label }) => (
+                <div key={key}>
+                  <Label htmlFor={key as string} className="flex items-center gap-2">
+                    {label}
+                    {isUncertain(key as string) && (
+                      <span className="text-xs text-amber-600 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" /> Needs verification
+                      </span>
+                    )}
+                    {formData[key] && !isUncertain(key as string) && (
+                      <CheckCircle2 className="w-3 h-3 text-green-500" />
+                    )}
+                  </Label>
+                  <Input
+                    id={key as string}
+                    type="date"
+                    value={(formData[key] as string) || ""}
+                    onChange={(e) => handleChange(key, e.target.value)}
+                    className={needsAttention(key as string) ? "border-amber-400 bg-amber-50 focus:border-amber-500" : ""}
+                  />
+                </div>
+              ))}
             </div>
           </div>
 
@@ -306,6 +379,72 @@ export default function ContractForm({ initialData, onSave, onCancel }) {
           </div>
         </CardContent>
       </Card>
+      
+      {/* Date Confirmation Dialog */}
+      {showDateConfirmation && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="max-w-lg w-full shadow-2xl">
+            <CardHeader className="border-b bg-amber-50">
+              <CardTitle className="flex items-center gap-2 text-amber-800">
+                <AlertTriangle className="w-5 h-5" />
+                Verify Dates Before Saving
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+              <p className="text-gray-700">
+                The following dates need your attention. They were either not found in the PDF or couldn't be confidently extracted:
+              </p>
+              
+              <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                {getMissingOrUncertainDates().map(({ key, label }) => (
+                  <div key={key} className="flex items-center justify-between py-2 border-b last:border-0">
+                    <span className="font-medium text-gray-700">{label}</span>
+                    <span className={`text-sm ${formData[key] ? 'text-amber-600' : 'text-red-600'}`}>
+                      {formData[key] ? (
+                        <span className="flex items-center gap-1">
+                          <AlertTriangle className="w-4 h-4" />
+                          {formData[key] as string} (unverified)
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1">
+                          <AlertCircle className="w-4 h-4" />
+                          Not set
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              
+              <Alert className="border-blue-200 bg-blue-50">
+                <Calendar className="w-4 h-4 text-blue-600" />
+                <AlertDescription className="text-blue-800">
+                  <strong>Tip:</strong> After saving, you can add all dates to your calendar from the Contract Details page.
+                </AlertDescription>
+              </Alert>
+              
+              <div className="flex gap-3 pt-4">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setShowDateConfirmation(false)}
+                  className="flex-1"
+                >
+                  Go Back & Edit Dates
+                </Button>
+                <Button 
+                  type="button"
+                  onClick={handleConfirmSave}
+                  className="flex-1 bg-[#1e3a5f] hover:bg-[#2d4a6f]"
+                >
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  Save Anyway
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </form>
   );
 }

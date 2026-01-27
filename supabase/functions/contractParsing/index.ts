@@ -16,6 +16,35 @@ const openai = new OpenAI({
 const CONTRACTS_BUCKET = "contracts";
 const SUMMARY_FOLDER = "summaries";
 
+// Helper function to normalize dates to YYYY-MM-DD format
+function normalizeDate(dateStr: string | null | undefined): string | null {
+  if (!dateStr || dateStr === "" || dateStr === "UNCERTAIN") return null;
+  
+  // Already in YYYY-MM-DD format
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+  
+  try {
+    const date = new Date(dateStr);
+    if (!isNaN(date.getTime())) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+  } catch (e) {
+    console.warn("Could not parse date:", dateStr);
+  }
+  
+  // Try MM/DD/YYYY format
+  const usDateMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (usDateMatch) {
+    const [, month, day, year] = usDateMatch;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+  
+  return null;
+}
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -25,7 +54,7 @@ const corsHeaders = {
 
 function buildParserPrompt() {
   return `
-You are an expert real estate contract analyst.
+You are an expert real estate contract analyst specializing in accurate date extraction.
 
 Extract fields **exactly** in this JSON shape:
 
@@ -47,17 +76,38 @@ Extract fields **exactly** in this JSON shape:
   "is_counter_offer": false,
   "counter_offer_number": null,
   "original_contract_id": null,
-  "plain_language_summary": ""
+  "plain_language_summary": "",
+  "_uncertain_fields": []
 }
 
-RULES:
-- Dates must be YYYY-MM-DD format.
-- If not found, return "" (empty string), not null.
-- If multiple buyers/sellers, return primary one.
+CRITICAL DATE EXTRACTION RULES:
+1. READ THE DOCUMENT CAREFULLY - Look for dates in ALL sections
+2. Dates in real estate contracts appear in many formats:
+   - "January 15, 2025" or "Jan 15, 2025"
+   - "1/15/2025" or "01/15/2025"
+   - "15th day of January, 2025"
+   - "Within X days of contract date" (calculate from contract_date)
+   - "On or before [date]"
+3. ALWAYS convert ALL dates to YYYY-MM-DD format (e.g., 2025-01-15)
+4. For relative dates like "within 10 days of contract date", calculate the actual date
+
+COMMON DATE LOCATIONS IN CONTRACTS:
+- Contract/Effective Date: Usually at the top or in signature section
+- Closing Date: Look for "Settlement", "Closing", "Close of Escrow"
+- Inspection Date: Look for "Inspection Period", "Due Diligence", "Option Period"
+- Inspection Response: Look for "Objection Deadline", "Resolution Period"
+- Loan Contingency: Look for "Financing Contingency", "Loan Approval"
+- Appraisal: Look for "Appraisal Contingency"
+- Final Walkthrough: Often 24-48 hours before closing or specified separately
+
+OTHER RULES:
+- If a date is not found or you're uncertain, add the field name to _uncertain_fields array
+- If not found, return "" (empty string), not null
+- If multiple buyers/sellers, return primary one
 - Detect if the document is an Amendment OR Counteroffer:
-  • If so, set is_counter_offer = true and counter_offer_number = number detected.
-  • The frontend will assign original_contract_id later.
-- plain_language_summary = 3–6 sentence human-readable summary.
+  • If so, set is_counter_offer = true and counter_offer_number = number detected
+  • The frontend will assign original_contract_id later
+- plain_language_summary = 3–6 sentence human-readable summary focusing on price, key dates, and special conditions
 `;
 }
 
@@ -115,8 +165,33 @@ serve(async (req) => {
       ],
     });
 
-    const extracted = JSON.parse(aiResponse.choices[0].message.content ?? "{}");
-    console.log("AI extraction:", extracted);
+    const rawExtracted = JSON.parse(aiResponse.choices[0].message.content ?? "{}");
+    console.log("AI extraction (raw):", rawExtracted);
+    
+    // Normalize all date fields
+    const dateFields = [
+      'contract_date', 'inspection_date', 'inspection_response_date',
+      'loan_contingency_date', 'appraisal_date', 'final_walkthrough_date', 'closing_date'
+    ];
+    
+    const uncertainFields: string[] = rawExtracted._uncertain_fields || [];
+    
+    // Process and normalize dates, track which ones couldn't be parsed
+    const extracted = { ...rawExtracted };
+    for (const field of dateFields) {
+      const rawDate = rawExtracted[field];
+      const normalizedDate = normalizeDate(rawDate);
+      extracted[field] = normalizedDate || "";
+      
+      // If we couldn't normalize a non-empty date, mark it uncertain
+      if (rawDate && !normalizedDate && !uncertainFields.includes(field)) {
+        uncertainFields.push(field);
+        console.warn(`Date normalization failed for ${field}: ${rawDate}`);
+      }
+    }
+    
+    extracted._uncertain_fields = uncertainFields;
+    console.log("AI extraction (normalized):", extracted);
 
     const { error: updateError } = await supabase
       .from("contracts")
