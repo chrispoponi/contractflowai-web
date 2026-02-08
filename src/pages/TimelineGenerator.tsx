@@ -20,10 +20,11 @@ export default function TimelineGenerator() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('contracts')
-        .select('id, property_address')
+        .select('id, property_address, title, buyer_name, created_at')
         .eq('user_id', user!.id)
+        .order('created_at', { ascending: false })
       if (error) throw error
-      return data as Pick<Tables<'contracts'>, 'id' | 'property_address'>[]
+      return data as Pick<Tables<'contracts'>, 'id' | 'property_address' | 'title' | 'buyer_name' | 'created_at'>[]
     }
   })
 
@@ -61,11 +62,22 @@ export default function TimelineGenerator() {
               <SelectValue placeholder="Select contract" />
             </SelectTrigger>
             <SelectContent>
-              {contracts.map((contract) => (
-                <SelectItem key={contract.id} value={contract.id}>
-                  {contract.property_address ?? 'Contract'}
-                </SelectItem>
-              ))}
+              {contracts.map((contract) => {
+                const displayName = contract.property_address 
+                  || contract.title 
+                  || (contract.buyer_name ? `Contract - ${contract.buyer_name}` : null)
+                  || `Contract #${contract.id.slice(0, 8)}`;
+                const date = contract.created_at ? new Date(contract.created_at).toLocaleDateString() : '';
+                
+                return (
+                  <SelectItem key={contract.id} value={contract.id}>
+                    <div className="flex flex-col">
+                      <span>{displayName}</span>
+                      {date && <span className="text-xs text-muted-foreground">{date}</span>}
+                    </div>
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
           <Button onClick={handleGenerate} disabled={isLoading}>
