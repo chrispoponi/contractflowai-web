@@ -265,8 +265,10 @@ export default function UploadContract() {
                     }
                   }}
                   disabled={!canDownloadCalendar}
+                  className="flex flex-col h-auto py-3"
                 >
-                  Download .ics
+                  <span>Download .ics</span>
+                  <span className="text-xs text-muted-foreground font-normal">(Any Calendar)</span>
                 </Button>
                 <Button
                   variant="outline"
