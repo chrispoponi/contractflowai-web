@@ -189,8 +189,8 @@ export default function UploadContract() {
       });
 
       toast({
-        title: "Contract parsed",
-        description: "Review the extracted details below.",
+        title: "✅ Contract saved successfully!",
+        description: `${extracted.property_address || 'Contract'} has been saved. Click "View contract" to add dates to your calendar.`,
       });
     } catch (error: any) {
       console.error("Upload error:", error);
@@ -226,6 +226,22 @@ export default function UploadContract() {
 
       {parsingResult && (
         <>
+          <Card className="border-2 border-green-200 bg-green-50 shadow-lg">
+            <CardHeader className="bg-green-100 border-b border-green-200">
+              <CardTitle className="flex items-center gap-2 text-green-800">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Contract Saved Successfully!
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+              <p className="text-sm text-green-700 font-medium">
+                {parsingResult.propertyAddress || 'Your contract'} has been extracted and saved. Review the details below and add deadlines to your calendar.
+              </p>
+            </CardContent>
+          </Card>
+
           <Card className="border bg-white shadow-lg">
             <CardHeader>
               <CardTitle>AI Summary</CardTitle>
@@ -235,8 +251,11 @@ export default function UploadContract() {
                 {parsingResult.summary}
               </p>
               <div className="flex flex-wrap gap-3">
-                <Button onClick={() => setEmailModalOpen(true)}>
-                  Send summary via email
+                <Button 
+                  onClick={() => navigate(`/contracts/${parsingResult.contractId}`)}
+                  className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
+                >
+                  View Contract & Add to Calendar
                 </Button>
                 <Button
                   variant="outline"
@@ -250,10 +269,10 @@ export default function UploadContract() {
                   Download .ics
                 </Button>
                 <Button
-                  variant="ghost"
-                  onClick={() => navigate(`/contracts/${parsingResult.contractId}`)}
+                  variant="outline"
+                  onClick={() => setEmailModalOpen(true)}
                 >
-                  View contract
+                  Send summary via email
                 </Button>
               </div>
             </CardContent>
