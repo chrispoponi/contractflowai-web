@@ -96,6 +96,15 @@ export default function EditContractModal({ contract, open, onClose, onSave }: E
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <div>
+              <Label htmlFor="contract_date">Contract Date</Label>
+              <Input
+                id="contract_date"
+                type="date"
+                value={form.contract_date ?? ''}
+                onChange={(event) => handleChange('contract_date', event.target.value)}
+              />
+            </div>
+            <div>
               <Label htmlFor="closing_date">Closing date</Label>
               <Input
                 id="closing_date"
@@ -104,6 +113,8 @@ export default function EditContractModal({ contract, open, onClose, onSave }: E
                 onChange={(event) => handleChange('closing_date', event.target.value)}
               />
             </div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
             <div>
               <Label htmlFor="inspection_date">Inspection date</Label>
               <Input
@@ -111,6 +122,46 @@ export default function EditContractModal({ contract, open, onClose, onSave }: E
                 type="date"
                 value={form.inspection_date ?? ''}
                 onChange={(event) => handleChange('inspection_date', event.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="inspection_response_date">Inspection Response</Label>
+              <Input
+                id="inspection_response_date"
+                type="date"
+                value={form.inspection_response_date ?? ''}
+                onChange={(event) => handleChange('inspection_response_date', event.target.value)}
+              />
+            </div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <Label htmlFor="loan_contingency_date">Loan Contingency</Label>
+              <Input
+                id="loan_contingency_date"
+                type="date"
+                value={form.loan_contingency_date ?? ''}
+                onChange={(event) => handleChange('loan_contingency_date', event.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="appraisal_date">Appraisal date</Label>
+              <Input
+                id="appraisal_date"
+                type="date"
+                value={form.appraisal_date ?? ''}
+                onChange={(event) => handleChange('appraisal_date', event.target.value)}
+              />
+            </div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <Label htmlFor="final_walkthrough_date">Final Walkthrough</Label>
+              <Input
+                id="final_walkthrough_date"
+                type="date"
+                value={form.final_walkthrough_date ?? ''}
+                onChange={(event) => handleChange('final_walkthrough_date', event.target.value)}
               />
             </div>
           </div>
