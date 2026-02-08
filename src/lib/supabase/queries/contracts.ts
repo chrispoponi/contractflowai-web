@@ -46,6 +46,7 @@ const CONTRACT_COLUMNS = `
   plain_language_summary,
   ai_summary,
   summary_path,
+  referral_source,
   created_at,
   updated_at
 `

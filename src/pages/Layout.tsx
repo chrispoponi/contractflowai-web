@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Link, Outlet, useLocation } from 'react-router-dom'
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
   Upload,
@@ -14,7 +14,8 @@ import {
   BellRing,
   TimerReset,
   MessageSquare,
-  ShieldCheck
+  ShieldCheck,
+  ArrowLeft
 } from 'lucide-react'
 import {
   Sidebar,
@@ -121,6 +122,7 @@ const adminItems = [
 
 export default function Layout() {
   const location = useLocation()
+  const navigate = useNavigate()
   const { user, signOut } = useAuth()
   const isAdmin =
     user?.app_metadata?.role === 'admin' || (user?.email ? ADMIN_EMAILS.includes(user.email.toLowerCase()) : false)
@@ -134,6 +136,17 @@ export default function Layout() {
       .substring(0, 2)
       .toUpperCase()
   }, [user])
+  
+  // Show back button on detail/sub pages
+  const showBackButton = useMemo(() => {
+    return location.pathname !== '/dashboard' && 
+           location.pathname !== '/upload' &&
+           location.pathname !== '/calendar' &&
+           location.pathname !== '/contracts/archived' &&
+           !location.pathname.includes('/landing') &&
+           !location.pathname.includes('/login') &&
+           !location.pathname.includes('/signup');
+  }, [location.pathname])
 
   return (
     <SidebarProvider>
@@ -248,6 +261,17 @@ export default function Layout() {
             <p className="text-base font-semibold text-slate-900">ContractFlowAI</p>
           </header>
           <main className="flex-1 overflow-y-auto bg-slate-50">
+            {showBackButton && (
+              <div className="border-b border-slate-200 bg-white px-6 py-3">
+                <button
+                  onClick={() => navigate('/dashboard')}
+                  className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 transition"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Back to Dashboard
+                </button>
+              </div>
+            )}
             <Outlet />
           </main>
         </div>
