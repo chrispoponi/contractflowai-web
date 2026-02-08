@@ -75,12 +75,21 @@ export default function ReminderSettings() {
             </div>
             <Switch checked={preferences.email} onCheckedChange={(value) => setPreferences((prev) => ({ ...prev, email: value }))} />
           </div>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between opacity-60">
             <div>
-              <p className="font-medium">SMS reminders</p>
-              <p className="text-sm text-slate-500">Requires verified phone number.</p>
+              <div className="flex items-center gap-2">
+                <p className="font-medium">SMS reminders</p>
+                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                  Coming Soon
+                </span>
+              </div>
+              <p className="text-sm text-slate-500">Text message notifications for urgent deadlines.</p>
             </div>
-            <Switch checked={preferences.sms} onCheckedChange={(value) => setPreferences((prev) => ({ ...prev, sms: value }))} />
+            <Switch 
+              checked={preferences.sms} 
+              onCheckedChange={(value) => setPreferences((prev) => ({ ...prev, sms: value }))}
+              disabled
+            />
           </div>
           <div>
             <Label htmlFor="daily-time">Daily digest time</Label>
