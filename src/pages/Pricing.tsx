@@ -126,17 +126,17 @@ export default function PricingPage() {
         </p>
       </header>
 
-      <section className="mx-auto grid max-w-7xl gap-6 px-4 pb-16 sm:grid-cols-2 lg:grid-cols-4 sm:px-6 lg:px-8">
+      <section className="mx-auto grid max-w-7xl gap-6 px-4 pb-16 pt-6 sm:grid-cols-2 lg:grid-cols-4 sm:px-6 lg:px-8">
         {plans.map((plan) => (
           <Card
             key={plan.name}
-            className={`relative border-2 ${
+            className={`relative border-2 overflow-visible ${
               plan.highlighted ? 'border-[#1e3a5f] shadow-2xl lg:scale-105' : 'border-gray-200 hover:border-gray-300 hover:shadow-lg'
             }`}
           >
             {plan.highlighted && (
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                <span className="rounded-full bg-[#1e3a5f] px-4 py-1 text-xs font-semibold uppercase tracking-wide text-white">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 whitespace-nowrap z-10">
+                <span className="rounded-full bg-[#1e3a5f] px-4 py-1 text-xs font-semibold uppercase tracking-wide text-white shadow-lg">
                   Most Popular
                 </span>
               </div>

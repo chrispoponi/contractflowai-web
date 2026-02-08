@@ -210,16 +210,6 @@ export default function Dashboard() {
                 </Button>
               </CardContent>
             </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Storage Health</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-slate-500">
-                  Contracts are stored in Supabase buckets (`contracts`, `counter_offers`, `summaries`, `uploads`).
-                </p>
-              </CardContent>
-            </Card>
           </div>
 
           <ContractsList contracts={contracts} isLoading={isLoading} />
