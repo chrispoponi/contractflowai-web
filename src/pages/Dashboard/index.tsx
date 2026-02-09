@@ -29,7 +29,12 @@ export default function Dashboard() {
   } = useQuery({
     queryKey: ['contracts', user?.id],
     enabled: Boolean(user?.id),
-    queryFn: () => listContracts(user!.id)
+    queryFn: () => listContracts(user!.id),
+    // Prevent automatic refetching - only refetch on manual action
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnWindowFocus: false,
+    refetchOnMount: true,
+    refetchInterval: false, // Disable polling
   })
 
   const timelineMutation = useMutation({

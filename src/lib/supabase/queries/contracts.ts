@@ -7,6 +7,13 @@ type ContractPayload = Database['public']['Tables']['contracts']['Insert']
 
 type ContractUpdate = Database['public']['Tables']['contracts']['Update']
 
+// Absolute bare minimum columns (guaranteed to exist)
+const BARE_MINIMUM = `
+  id,
+  user_id,
+  created_at
+`
+
 // Minimal columns that MUST exist in any contracts table
 const MINIMAL_COLUMNS = `
   id,
