@@ -7,7 +7,26 @@ type ContractPayload = Database['public']['Tables']['contracts']['Insert']
 
 type ContractUpdate = Database['public']['Tables']['contracts']['Update']
 
-// Core columns that should always exist
+// Minimal columns that MUST exist in any contracts table
+const MINIMAL_COLUMNS = `
+  id,
+  user_id,
+  title,
+  property_address,
+  buyer_name,
+  seller_name,
+  purchase_price,
+  earnest_money,
+  contract_date,
+  inspection_date,
+  closing_date,
+  status,
+  contract_file_url,
+  created_at,
+  updated_at
+`
+
+// Core columns that should exist after basic setup
 const CORE_COLUMNS = `
   id,
   user_id,
@@ -58,8 +77,9 @@ const EXTENDED_COLUMNS = `
   client_name
 `
 
-// Use core columns by default (safer for querying)
-const CONTRACT_COLUMNS = CORE_COLUMNS
+// Use minimal columns by default (safest for querying)
+// Switch to CORE_COLUMNS or add EXTENDED_COLUMNS once you've added them to your DB
+const CONTRACT_COLUMNS = MINIMAL_COLUMNS
 
 export const ContractsAPI = {
   listByUser: async (userId: string) => {
