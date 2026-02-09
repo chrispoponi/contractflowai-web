@@ -83,8 +83,22 @@ export default function FeedbackPage() {
       })
       return
     }
+    
     setIsSubmitting(true)
     try {
+      // Check session before submitting
+      const { data: sessionData } = await supabase.auth.getSession()
+      console.log('Current session:', {
+        hasSession: !!sessionData.session,
+        userId: sessionData.session?.user?.id,
+        provider: sessionData.session?.user?.app_metadata?.provider,
+        role: sessionData.session?.user?.role
+      })
+      
+      if (!sessionData.session) {
+        throw new Error('No active session found. Please sign in again.')
+      }
+      
       console.log('Submitting feedback:', {
         user_id: user.id,
         email: form.email,

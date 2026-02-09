@@ -11,7 +11,16 @@ if (!url || !anon) {
 export const supabase = createClient<Database>(url, anon, {
   auth: {
     persistSession: true,
-    detectSessionInUrl: true
+    detectSessionInUrl: true,
+    autoRefreshToken: true,
+    storage: window.localStorage,
+    storageKey: 'supabase.auth.token',
+    flowType: 'pkce' // Better for OAuth
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'contractflowai-web'
+    }
   }
 })
 
