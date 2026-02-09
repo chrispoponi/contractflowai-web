@@ -139,9 +139,18 @@ serve(async (req) => {
     }
 
     const pdfBytes = await fileData.arrayBuffer();
+    
+    // Upload PDF to OpenAI and use file upload API
+    const file = await openai.files.create({
+      file: new File([pdfBytes], "contract.pdf", { type: "application/pdf" }),
+      purpose: "assistants",
+    });
+    
+    console.log('Uploaded file to OpenAI:', file.id);
 
+    // Use OpenAI to extract text and parse it
     const aiResponse = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4o",
       temperature: 0.1,
       messages: [
         {
@@ -150,20 +159,17 @@ serve(async (req) => {
         },
         {
           role: "user",
-          content: [
-            {
-              type: "input_text",
-              text: "Analyze this contract and extract all fields.",
-            },
-            {
-              type: "input_file",
-              mime_type: "application/pdf",
-              data: Array.from(new Uint8Array(pdfBytes)),
-            },
-          ],
+          content: `I've uploaded a real estate contract PDF (file ID: ${file.id}). Please analyze it and extract all fields according to the system prompt. Return ONLY valid JSON, no markdown formatting.`,
         },
       ],
     });
+    
+    // Clean up the file
+    try {
+      await openai.files.del(file.id);
+    } catch (e) {
+      console.warn('Failed to delete file:', e);
+    }
 
     const rawExtracted = JSON.parse(aiResponse.choices[0].message.content ?? "{}");
     console.log("AI extraction (raw):", rawExtracted);
@@ -190,6 +196,17 @@ serve(async (req) => {
       }
     }
     
+    // Clean monetary values (remove $, commas)
+    function cleanMoney(value: any): number | null {
+      if (!value) return null;
+      if (typeof value === 'number') return value;
+      const cleaned = String(value).replace(/[$,]/g, '');
+      const num = parseFloat(cleaned);
+      return isNaN(num) ? null : num;
+    }
+    
+    extracted.purchase_price = cleanMoney(rawExtracted.purchase_price);
+    extracted.earnest_money = cleanMoney(rawExtracted.earnest_money);
     extracted._uncertain_fields = uncertainFields;
     console.log("AI extraction (normalized):", extracted);
 

@@ -7,18 +7,16 @@ type ContractPayload = Database['public']['Tables']['contracts']['Insert']
 
 type ContractUpdate = Database['public']['Tables']['contracts']['Update']
 
-const CONTRACT_COLUMNS = `
+// Core columns that should always exist
+const CORE_COLUMNS = `
   id,
   user_id,
   title,
   property_address,
   buyer_name,
-  buyer_email,
   seller_name,
-  seller_email,
   purchase_price,
   earnest_money,
-  representing_side,
   contract_date,
   inspection_date,
   inspection_response_date,
@@ -26,32 +24,42 @@ const CONTRACT_COLUMNS = `
   loan_contingency_date,
   final_walkthrough_date,
   closing_date,
+  status,
+  is_counter_offer,
+  counter_offer_number,
+  original_contract_id,
+  contract_file_url,
+  plain_language_summary,
+  ai_summary,
+  created_at,
+  updated_at
+`
+
+// Full columns including optional fields (use only if columns exist in your DB)
+const EXTENDED_COLUMNS = `
+  buyer_email,
+  seller_email,
+  representing_side,
   inspection_completed,
   inspection_response_completed,
   appraisal_completed,
   loan_contingency_completed,
   final_walkthrough_completed,
   closing_completed,
-  status,
   all_parties_signed,
   signature_date,
-  is_counter_offer,
-  counter_offer_number,
-  original_contract_id,
   cancellation_reason,
   cancellation_notes,
   cancellation_date,
-  contract_file_url,
   counter_offer_path,
-  plain_language_summary,
-  ai_summary,
   summary_path,
   referral_source,
   agent_notes,
-  client_name,
-  created_at,
-  updated_at
+  client_name
 `
+
+// Use core columns by default (safer for querying)
+const CONTRACT_COLUMNS = CORE_COLUMNS
 
 export const ContractsAPI = {
   listByUser: async (userId: string) => {
