@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ShieldCheck, UserPlus, Ban, RefreshCcw } from 'lucide-react'
+import { ShieldCheck, UserPlus, Ban, RefreshCcw, TestTube } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -41,6 +41,7 @@ export default function AdminUsers() {
   }, [user])
 
   const [newUser, setNewUser] = useState({ email: '', password: '', fullName: '' })
+  const [testMode, setTestMode] = useState(true) // Default to test mode for safety
 
   const { data: users, isLoading, error } = useQuery({
     queryKey: ['admin-users'],
@@ -80,14 +81,22 @@ export default function AdminUsers() {
       const { data, error } = await supabase.functions.invoke<AdminFunctionResponse>('adminUsers', {
         body: {
           action: 'resetPassword',
-          payload: { userId }
+          payload: { userId, testMode }
         }
       })
       if (error) throw new Error(error.message)
-      toast({
-        title: 'Reset link generated',
-        description: data?.link ? `Link sent to ${email}` : 'Supabase handled password reset email.'
-      })
+      
+      if (testMode) {
+        toast({
+          title: '🧪 TEST MODE - No Action Taken',
+          description: `Would send password reset link to ${email}`,
+        })
+      } else {
+        toast({
+          title: 'Reset link generated',
+          description: data?.link ? `Link sent to ${email}` : 'Supabase handled password reset email.'
+        })
+      }
     } catch (err) {
       toast({ title: 'Reset failed', description: err instanceof Error ? err.message : String(err), variant: 'destructive' })
     }
@@ -99,12 +108,20 @@ export default function AdminUsers() {
       const { error } = await supabase.functions.invoke('adminUsers', {
         body: {
           action: 'blockUser',
-          payload: { userId: adminUser.id, banned: !isBanned }
+          payload: { userId: adminUser.id, banned: !isBanned, testMode }
         }
       })
       if (error) throw new Error(error.message)
-      toast({ title: !isBanned ? 'User blocked' : 'User unblocked' })
-      queryClient.invalidateQueries({ queryKey: ['admin-users'] }).catch(() => {})
+      
+      if (testMode) {
+        toast({ 
+          title: '🧪 TEST MODE - No Action Taken',
+          description: `Would ${!isBanned ? 'block' : 'unblock'} user: ${adminUser.email}` 
+        })
+      } else {
+        toast({ title: !isBanned ? 'User blocked' : 'User unblocked' })
+        queryClient.invalidateQueries({ queryKey: ['admin-users'] }).catch(() => {})
+      }
     } catch (err) {
       toast({ title: 'Update failed', description: err instanceof Error ? err.message : String(err), variant: 'destructive' })
     }
@@ -127,13 +144,34 @@ export default function AdminUsers() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-4 py-10">
-      <div className="flex items-center gap-3">
-        <div className="rounded-full bg-indigo-100 p-3 text-indigo-700">
-          <ShieldCheck className="h-5 w-5" />
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="rounded-full bg-indigo-100 p-3 text-indigo-700">
+            <ShieldCheck className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900">Admin Control Center</h1>
+            <p className="text-sm text-slate-500">Create users, reset credentials, and manage account access.</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Admin Control Center</h1>
-          <p className="text-sm text-slate-500">Create users, reset credentials, and manage account access.</p>
+        
+        {/* Test Mode Toggle */}
+        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2">
+          <TestTube className={`h-4 w-4 ${testMode ? 'text-orange-500' : 'text-slate-400'}`} />
+          <span className="text-sm font-medium text-slate-700">Test Mode</span>
+          <button
+            onClick={() => setTestMode(!testMode)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              testMode ? 'bg-orange-500' : 'bg-slate-300'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                testMode ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+          {testMode && <Badge variant="secondary" className="bg-orange-100 text-orange-700">Safe Mode</Badge>}
         </div>
       </div>
 

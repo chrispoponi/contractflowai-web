@@ -46,10 +46,20 @@ serve(async (req) => {
         return jsonResponse(200, { user: data.user })
       }
       case 'resetPassword': {
-        const { userId } = payload ?? {}
+        const { userId, testMode = false } = payload ?? {}
         if (!userId) {
           return jsonResponse(400, { error: 'userId required' })
         }
+        
+        // Test mode: simulate without actually generating link
+        if (testMode) {
+          return jsonResponse(200, { 
+            testMode: true,
+            message: 'TEST MODE: Would generate password reset link',
+            link: `${appUrl}?test=true&userId=${userId}` 
+          })
+        }
+        
         const { data, error } = await supabase.auth.admin.generateLink({
           type: 'recovery',
           user_id: userId,
@@ -61,10 +71,20 @@ serve(async (req) => {
         return jsonResponse(200, { link: data.properties?.action_link ?? null })
       }
       case 'blockUser': {
-        const { userId, banned = true } = payload ?? {}
+        const { userId, banned = true, testMode = false } = payload ?? {}
         if (!userId) {
           return jsonResponse(400, { error: 'userId required' })
         }
+        
+        // Test mode: simulate without actually blocking/unblocking
+        if (testMode) {
+          return jsonResponse(200, { 
+            testMode: true,
+            message: `TEST MODE: Would ${banned ? 'block' : 'unblock'} user`,
+            user: { id: userId, banned }
+          })
+        }
+        
         const { data, error } = await supabase.auth.admin.updateUserById(userId, { banned })
         if (error) throw error
         return jsonResponse(200, { user: data })
