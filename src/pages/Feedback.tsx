@@ -85,18 +85,38 @@ export default function FeedbackPage() {
     }
     setIsSubmitting(true)
     try {
-      const { error } = await supabase.from('feedback').insert({
+      console.log('Submitting feedback:', {
+        user_id: user.id,
+        email: form.email,
+        topic: form.topic || 'General',
+        sentiment: form.sentiment || null,
+        message: form.message.substring(0, 50) + '...'
+      })
+      
+      const { data, error } = await supabase.from('feedback').insert({
         user_id: user.id,
         email: form.email,
         topic: form.topic || 'General',
         sentiment: form.sentiment || null,
         message: form.message
       })
-      if (error) throw error
-      toast({ title: 'Thanks for the feedback!' })
+      
+      if (error) {
+        console.error('Feedback submission error:', error)
+        throw new Error(error.message || JSON.stringify(error))
+      }
+      
+      console.log('Feedback submitted successfully:', data)
+      toast({ title: 'Thanks for the feedback!', description: 'Your feedback has been submitted successfully.' })
       setForm((prev) => ({ ...prev, topic: '', sentiment: '', message: '' }))
     } catch (err) {
-      toast({ title: 'Unable to send feedback', description: err instanceof Error ? err.message : String(err), variant: 'destructive' })
+      console.error('Feedback error:', err)
+      const errorMessage = err instanceof Error ? err.message : (typeof err === 'object' ? JSON.stringify(err) : String(err))
+      toast({ 
+        title: 'Unable to send feedback', 
+        description: errorMessage,
+        variant: 'destructive' 
+      })
     } finally {
       setIsSubmitting(false)
     }
