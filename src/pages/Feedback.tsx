@@ -31,6 +31,8 @@ export default function FeedbackPage() {
   const { data: previousFeedback = [], isLoading } = useQuery({
     queryKey: ['feedback', user?.id, feedbackEnabled],
     enabled: Boolean(user?.id) && feedbackEnabled,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('feedback')
